@@ -1,0 +1,114 @@
+:host {
+    --ion-color-primary: #3880ff;
+    --ion-color-secondary: #3dc2ff;
+    --ion-color-tertiary: #5260ff;
+    --ion-color-success: #2dd36f;
+    --ion-color-warning: #ffc409;
+    --ion-color-danger: #eb445a;
+    --ion-color-medium: #92949c;
+    --ion-color-light: #f4f5f8;
+  }
+  
+  ion-content {
+    --background: var(--ion-color-light);
+  }
+  
+  h1 {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--ion-color-dark);
+    margin-bottom: 20px;
+  }
+  
+  .cart-items {
+    background: transparent;
+  
+    ion-item {
+      --background: #ffffff;
+      --border-radius: 10px;
+      margin-bottom: 10px;
+      --padding-start: 0;
+  
+      ion-thumbnail {
+        --size: 80px;
+        --border-radius: 8px;
+        margin-right: 16px;
+      }
+  
+      ion-label {
+        h2 {
+          font-size: 18px;
+          font-weight: 600;
+          color: var(--ion-color-dark);
+        }
+  
+        p {
+          font-size: 14px;
+          color: var(--ion-color-medium);
+        }
+      }
+  
+      ion-note {
+        font-size: 16px;
+        font-weight: 600;
+      }
+    }
+  }
+  
+  .order-details {
+    margin-top: 20px;
+  
+    ion-item {
+      --background: #ffffff;
+      --border-radius: 10px;
+      margin-bottom: 10px;
+    }
+  
+    .total {
+      --background: var(--ion-color-light);
+      font-weight: bold;
+  
+      ion-label h2 {
+        font-size: 18px;
+        color: var(--ion-color-dark);
+      }
+  
+      ion-note {
+        font-size: 18px;
+        font-weight: 600;
+      }
+    }
+  }
+  
+  ion-footer {
+    ion-toolbar {
+      --background: var(--ion-color-light);
+      --border-color: transparent;
+    }
+  
+    ion-button {
+      margin: 10px;
+    }
+  }
+  
+  @media (max-width: 576px) {
+    .cart-items ion-item {
+      ion-thumbnail {
+        --size: 60px;
+      }
+  
+      ion-label h2 {
+        font-size: 16px;
+      }
+  
+      ion-note {
+        font-size: 14px;
+      }
+    }
+  
+    .order-details .total {
+      ion-label h2, ion-note {
+        font-size: 16px;
+      }
+    }
+  }

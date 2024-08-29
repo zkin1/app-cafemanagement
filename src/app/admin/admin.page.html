@@ -1,0 +1,51 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Dashboard</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <h2>Estadísticas de Ventas</h2>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Ventas Totales</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <h1>{{ totalSales | currency:'CLP':'symbol-narrow':'1.0-0' }}</h1>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Productos Más Vendidos</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-list>
+        <ion-item *ngFor="let product of topProducts">
+          <ion-label>{{ product.name }}</ion-label>
+          <ion-note slot="end">{{ product.sales }} unidades</ion-note>
+        </ion-item>
+      </ion-list>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Ventas por Día</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-list>
+        <ion-item *ngFor="let sale of dailySales">
+          <ion-label>{{ sale.day }}</ion-label>
+          <ion-note slot="end">{{ sale.amount | currency:'CLP':'symbol-narrow':'1.0-0' }}</ion-note>
+        </ion-item>
+      </ion-list>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-button expand="block" routerLink="/crud">Generar reporte</ion-button>
+</ion-content>

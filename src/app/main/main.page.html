@@ -1,0 +1,69 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Menú - Orden #{{ currentOrderNumber }}</ion-title>
+    <ion-buttons slot="end">
+      <ion-button routerLink="/carro-compras">
+        <ion-icon name="cart-outline"></ion-icon>
+        <ion-badge *ngIf="currentOrderItems.length > 0">{{ currentOrderItems.length }}</ion-badge>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <div class="menu-container">
+    <ion-grid>
+      <ion-row>
+        <ion-col size="12" size-md="6" size-lg="4" *ngFor="let product of products; let i = index">
+          <ion-card class="product-card">
+            <img [src]="product.image" [alt]="product.name"/>
+            <ion-card-header>
+              <ion-card-title>{{ product.name }}</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+              <p>{{ product.description }}</p>
+              <ion-text color="primary">
+                <h2>{{ calculatePrice(product) | currency:'CLP':'symbol-narrow':'1.0-0' }}</h2>
+              </ion-text>
+              <ion-button expand="block" (click)="toggleOptions(i)">Personalizar y Añadir</ion-button>
+            </ion-card-content>
+          </ion-card>
+          
+          <ion-card *ngIf="product.showOptions" class="options-card" [@slideInOut]>
+            <ion-card-content>
+              <ion-item>
+                <ion-label>Tamaño</ion-label>
+                <ion-select [(ngModel)]="product.selectedSize" (ionChange)="updatePrice(product)" interface="popover">
+                  <ion-select-option value="pequeño">Pequeño (-$1.000)</ion-select-option>
+                  <ion-select-option value="medium">Mediano</ion-select-option>
+                  <ion-select-option value="grande">Grande (+$1.000)</ion-select-option>
+                </ion-select>
+              </ion-item>
+              <ion-item>
+                <ion-label>Tipo de leche</ion-label>
+                <ion-select [(ngModel)]="product.selectedMilk" interface="popover">
+                  <ion-select-option value="regular">Regular</ion-select-option>
+                  <ion-select-option value="descremada">Descremada</ion-select-option>
+                  <ion-select-option value="soya">Soya</ion-select-option>
+                  <ion-select-option value="almendra">Almendra</ion-select-option>
+                </ion-select>
+              </ion-item>
+              <ion-button expand="block" (click)="addToCart(product)">Añadir al Carrito</ion-button>
+            </ion-card-content>
+          </ion-card>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+  </div>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <ion-button expand="block" routerLink="/carro-compras" [disabled]="currentOrderItems.length === 0">
+      Completar Orden ({{ currentOrderItems.length }} items)
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>

@@ -1,0 +1,67 @@
+:host {
+    --ion-color-primary: #3880ff;
+    --ion-color-secondary: #3dc2ff;
+    --ion-color-tertiary: #5260ff;
+    --ion-color-success: #2dd36f;
+    --ion-color-warning: #ffc409;
+    --ion-color-danger: #eb445a;
+    --ion-color-medium: #92949c;
+    --ion-color-light: #f4f5f8;
+  }
+  
+  ion-content {
+    --background: #f4f5f8;
+  }
+  
+  h2 {
+    color: #333;
+    font-size: 24px;
+    margin-bottom: 20px;
+    font-weight: 600;
+  }
+  
+  ion-card {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    background-color: #ffffff;
+  
+    ion-card-header {
+      background-color: #f0f0f0;
+      border-bottom: 1px solid #e0e0e0;
+      
+      ion-card-title {
+        font-size: 18px;
+        font-weight: bold;
+        color: #333;
+      }
+    }
+  
+    ion-card-content {
+      padding: 16px;
+  
+      p {
+        margin: 8px 0;
+        font-size: 16px;
+        color: #333;
+      }
+    }
+  }
+  
+  ion-button {
+    margin-top: 10px;
+    --background: #5c9ce5;
+    --background-hover: #4a90e2;
+    --color: #ffffff;
+    --border-radius: 8px;
+  }
+  
+  // Animaciones
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  ion-card, ion-button {
+    animation: fadeIn 0.5s ease-out;
+  }

@@ -1,0 +1,134 @@
+:host {
+    --ion-color-primary: #3880ff;
+    --ion-color-secondary: #3dc2ff;
+    --ion-color-tertiary: #5260ff;
+    --ion-color-success: #2dd36f;
+    --ion-color-warning: #ffc409;
+    --ion-color-danger: #eb445a;
+    --ion-color-medium: #92949c;
+    --ion-color-light: #f4f5f8;
+  }
+  
+  .menu-container {
+    padding: 16px;
+  }
+  
+  .product-card {
+    margin-bottom: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  
+    img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+    }
+  
+    ion-card-header {
+      padding: 16px;
+    }
+  
+    ion-card-title {
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+  
+    ion-card-content {
+      padding: 0 16px 16px;
+  
+      p {
+        font-size: 0.9rem;
+        color: var(--ion-color-medium);
+        margin-bottom: 10px;
+      }
+  
+      h2 {
+        font-size: 1.4rem;
+        font-weight: bold;
+        margin: 10px 0;
+        color: var(--ion-color-success);
+      }
+  
+      ion-button {
+        margin-top: 10px;
+      }
+    }
+  }
+  
+  .options-card {
+    margin-top: -10px;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  
+    ion-card-content {
+      padding: 16px;
+    }
+  
+    ion-item {
+      --padding-start: 0;
+      --inner-padding-end: 0;
+    }
+  
+    ion-select {
+      width: 100%;
+      max-width: 100%;
+    }
+  
+    ion-button {
+      margin-top: 16px;
+    }
+  }
+  
+  ion-footer {
+    ion-toolbar {
+      --padding-top: 0;
+      --padding-bottom: 0;
+      --padding-start: 16px;
+      --padding-end: 16px;
+    }
+  
+    ion-button {
+      margin: 10px 0;
+    }
+  }
+  
+  // Animaciones
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .product-card {
+    animation: fadeIn 0.5s ease-out;
+  }
+  
+  // Estilos responsivos
+  @media (max-width: 576px) {
+    .product-card {
+      ion-card-title {
+        font-size: 1.1rem;
+      }
+  
+      ion-card-content {
+        p {
+          font-size: 0.85rem;
+        }
+  
+        h2 {
+          font-size: 1.3rem;
+        }
+      }
+    }
+  }
+  
+  // Estilos para el badge del carrito
+  ion-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 12px;
+    padding: 2px 4px;
+    border-radius: 50%;
+  }

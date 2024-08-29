@@ -1,0 +1,22 @@
+<ion-content class="ion-padding">
+  <div class="register-container">
+    <h1>Únete a nosotros</h1>
+    <h2>Registro</h2>
+    <form (ngSubmit)="onSubmit()">
+      <ion-item>
+        <ion-label position="floating">Nombre</ion-label>
+        <ion-input type="text" [(ngModel)]="name" name="name" required></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-label position="floating">Correo electrónico</ion-label>
+        <ion-input type="email" [(ngModel)]="email" name="email" required></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-label position="floating">Contraseña</ion-label>
+        <ion-input type="password" [(ngModel)]="password" name="password" required></ion-input>
+      </ion-item>
+      <ion-button expand="block" type="submit">Registrarse</ion-button>
+    </form>
+    <a [routerLink]="['/login']" class="login-link">¿Ya tienes una cuenta? Inicia sesión</a>
+  </div>
+</ion-content>

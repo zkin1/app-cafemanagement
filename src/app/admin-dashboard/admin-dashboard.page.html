@@ -1,0 +1,25 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Dashboard de Administrador</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <h2>Bienvenido, {{ adminName }}</h2>
+  
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Resumen</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <p>Ordenes de  hoy: {{ orderCount }}</p>
+      <p>Empleados activos: {{ activeEmployees }}</p>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-button expand="block" routerLink="/crud">Gestionar Menú</ion-button>
+  <ion-button expand="block" routerLink="/comandas">Ver Órdenes</ion-button>
+  <ion-button expand="block" routerLink="/employee-management">Gestionar Empleados</ion-button>
+  <ion-button expand="block" routerLink="/admin">Reportes</ion-button>
+  <ion-button expand="block" (click)="logout()">Cerrar Sesión</ion-button>
+</ion-content>

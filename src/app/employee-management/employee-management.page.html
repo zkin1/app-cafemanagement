@@ -1,0 +1,52 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/admin-dashboard"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Gestión de Empleados</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-list>
+    <ion-item *ngFor="let user of users">
+      <ion-label>
+        <h2>{{ user.name }}</h2>
+        <p>{{ user.email }}</p>
+        <p>Rol: {{ user.role }}</p>
+      </ion-label>
+      <ion-button slot="end" (click)="editUser(user)">Editar</ion-button>
+    </ion-item>
+  </ion-list>
+
+  <ion-modal [isOpen]="!!editingUser">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Editar Usuario</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="cancelEdit()">Cancelar</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <ion-item *ngIf="editingUser">
+          <ion-label position="floating">Nombre</ion-label>
+          <ion-input [(ngModel)]="editingUser.name"></ion-input>
+        </ion-item>
+        <ion-item *ngIf="editingUser">
+          <ion-label position="floating">Email</ion-label>
+          <ion-input [(ngModel)]="editingUser.email" type="email"></ion-input>
+        </ion-item>
+        <ion-item *ngIf="editingUser">
+          <ion-label>Rol</ion-label>
+          <ion-select [(ngModel)]="editingUser.role">
+            <ion-select-option value="admin">Admin</ion-select-option>
+            <ion-select-option value="empleado">Empleado</ion-select-option>
+          </ion-select>
+        </ion-item>
+        <ion-button expand="block" (click)="saveUser()">Guardar Cambios</ion-button>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+</ion-content>

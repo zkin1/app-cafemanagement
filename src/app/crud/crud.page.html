@@ -1,0 +1,119 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/admin"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Gestión de Productos</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="crud-menu">
+    <ion-button fill="clear" (click)="setActiveSection('add')" [class.active]="activeSection === 'add'">
+      <ion-icon name="add-circle-outline"></ion-icon>
+    </ion-button>
+    <ion-button fill="clear" (click)="setActiveSection('edit')" [class.active]="activeSection === 'edit'">
+      <ion-icon name="create-outline"></ion-icon>
+    </ion-button>
+    <ion-button fill="clear" (click)="setActiveSection('delete')" [class.active]="activeSection === 'delete'">
+      <ion-icon name="trash-outline"></ion-icon>
+    </ion-button>
+    <ion-button fill="clear" (click)="setActiveSection('view')" [class.active]="activeSection === 'view'">
+      <ion-icon name="list-outline"></ion-icon>
+    </ion-button>
+  </div>
+
+  <!-- Agregar Producto -->
+  <div *ngIf="activeSection === 'add'">
+    <h2>Agregar Producto</h2>
+    <form (ngSubmit)="addProduct()">
+      <ion-item>
+        <ion-label position="floating">Nombre</ion-label>
+        <ion-input [(ngModel)]="currentProduct.name" name="name" required></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-label position="floating">Descripción</ion-label>
+        <ion-textarea [(ngModel)]="currentProduct.description" name="description" required></ion-textarea>
+      </ion-item>
+      <ion-item>
+        <ion-label position="floating">Precio</ion-label>
+        <ion-input type="number" [(ngModel)]="currentProduct.price" name="price" required></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-label position="floating">URL de la imagen</ion-label>
+        <ion-input [(ngModel)]="currentProduct.image" name="image" required></ion-input>
+      </ion-item>
+      <ion-button expand="block" type="submit" class="ion-margin-top">Agregar Producto</ion-button>
+    </form>
+  </div>
+
+  <!-- Editar Producto -->
+  <div *ngIf="activeSection === 'edit'">
+    <h2>Editar Producto</h2>
+    <form (ngSubmit)="updateProduct()">
+      <ion-item>
+        <ion-label position="floating">Nombre</ion-label>
+        <ion-input [(ngModel)]="currentProduct.name" name="name" required></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-label position="floating">Descripción</ion-label>
+        <ion-textarea [(ngModel)]="currentProduct.description" name="description" required></ion-textarea>
+      </ion-item>
+      <ion-item>
+        <ion-label position="floating">Precio</ion-label>
+        <ion-input type="number" [(ngModel)]="currentProduct.price" name="price" required></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-label position="floating">URL de la imagen</ion-label>
+        <ion-input [(ngModel)]="currentProduct.image" name="image" required></ion-input>
+      </ion-item>
+      <ion-button expand="block" type="submit" class="ion-margin-top">Actualizar Producto</ion-button>
+    </form>
+    <ion-list>
+      <ion-item *ngFor="let product of products">
+        <ion-thumbnail slot="start">
+          <img [src]="product.image" [alt]="product.name">
+        </ion-thumbnail>
+        <ion-label>
+          <h2>{{ product.name }}</h2>
+          <p>{{ product.description }}</p>
+          <p>Precio: {{ product.price | currency:'CLP':'symbol-narrow':'1.0-0' }}</p>
+        </ion-label>
+        <ion-button slot="end" (click)="editProduct(product)">Editar</ion-button>
+      </ion-item>
+    </ion-list>
+
+  </div>
+
+  <!-- Eliminar Producto -->
+  <div *ngIf="activeSection === 'delete'">
+    <h2>Eliminar Producto</h2>
+    <ion-list>
+      <ion-item *ngFor="let product of products">
+        <ion-label>
+          <h2>{{ product.name }}</h2>
+          <p>Precio: {{ product.price | currency:'CLP':'symbol-narrow':'1.0-0' }}</p>
+        </ion-label>
+        <ion-button slot="end" color="danger" (click)="deleteProduct(product.id)">Eliminar</ion-button>
+      </ion-item>
+    </ion-list>
+  </div>
+
+  <!-- Ver Productos -->
+  <div *ngIf="activeSection === 'view'">
+    <h2>Lista de Productos</h2>
+    <ion-list>
+      <ion-item *ngFor="let product of products">
+        <ion-thumbnail slot="start">
+          <img [src]="product.image" [alt]="product.name">
+        </ion-thumbnail>
+        <ion-label>
+          <h2>{{ product.name }}</h2>
+          <p>{{ product.description }}</p>
+          <p>Precio: {{ product.price | currency:'CLP':'symbol-narrow':'1.0-0' }}</p>
+        </ion-label>
+        <ion-button slot="end" (click)="editProduct(product)">Editar</ion-button>
+      </ion-item>
+    </ion-list>
+  </div>
+</ion-content>

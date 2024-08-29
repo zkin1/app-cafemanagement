@@ -1,0 +1,51 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/main"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Orden #{{ orderNumber }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <h1>Resumen de la Orden</h1>
+  
+  <ion-list class="cart-items">
+    <ion-item *ngFor="let item of items">
+      <ion-thumbnail slot="start">
+        <img [src]="item.image" [alt]="item.name">
+      </ion-thumbnail>
+      <ion-label>
+        <h2>{{ item.name }}</h2>
+        <p>{{ item.selectedSize }}, {{ item.selectedMilk }}</p>
+        <p>Cantidad: 1</p>
+      </ion-label>
+      <ion-note slot="end" color="primary">${{ item.finalPrice.toFixed(0) }}</ion-note>
+    </ion-item>
+  </ion-list>
+  
+  <div class="order-details">
+    <ion-item>
+      <ion-label position="floating">Número de Mesa</ion-label>
+      <ion-input type="number" [(ngModel)]="tableNumber"></ion-input>
+    </ion-item>
+    
+    <ion-item>
+      <ion-label position="floating">Nota</ion-label>
+      <ion-textarea [(ngModel)]="note"></ion-textarea>
+    </ion-item>
+
+    <ion-item class="total">
+      <ion-label>
+        <h2>Total</h2>
+      </ion-label>
+      <ion-note slot="end" color="primary">${{ getTotalPrice().toFixed(0) }}</ion-note>
+    </ion-item>
+  </div>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <ion-button expand="block" (click)="confirmarOrden()">Confirmar Orden</ion-button>
+  </ion-toolbar>
+</ion-footer>

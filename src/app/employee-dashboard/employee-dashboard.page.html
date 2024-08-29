@@ -1,0 +1,24 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Dashboard de Empleado</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <h2>Bienvenido, {{ employeeName }}</h2>
+  
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Tu Resumen</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <p>Ordenes tomadas hoy: {{ ordersToday }}</p>
+      <p>Ordenes pendientes: {{ pendingOrders }}</p>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-button expand="block" routerLink="/main">Tomar Nueva Orden</ion-button>
+  <ion-button expand="block" routerLink="/comandas">Ver Órdenes Actuales</ion-button>
+  <ion-button expand="block" routerLink="/perfil">Mi Perfil</ion-button>
+  <ion-button expand="block" (click)="logout()">Cerrar Sesión</ion-button>
+</ion-content>
