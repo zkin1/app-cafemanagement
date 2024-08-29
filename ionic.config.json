@@ -1,0 +1,7 @@
+{
+  "name": "appCaffemanagement ",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
