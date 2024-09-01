@@ -17,9 +17,9 @@ interface User {
 })
 export class EmployeeManagementPage implements OnInit {
   users: User[] = [
-    { id: 1, name: 'Admin 1', email: 'admin@example.com', role: 'admin' },
-    { id: 2, name: 'Empleado 1', email: 'emp1@ejemplo.com', role: 'empleado' },
-    { id: 3, name: 'Empleado 2', email: 'emp2@ejemplo.com', role: 'empleado' }
+    { id: 1, name: 'Admin 1', email: 'admin@gmail.com', role: 'admin' },  
+    { id: 2, name: 'Empleado 1', email: 'emp1@gmail.com', role: 'empleado' },
+    { id: 3, name: 'Empleado 2', email: 'emp2@gmail.com', role: 'empleado' }
   ];
 
   editingUser: User | null = null;
