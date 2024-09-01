@@ -28,6 +28,13 @@
             </ion-item>
           </ion-menu-toggle>
 
+          <ion-menu-toggle auto-hide="false" *ngIf="isLoggedIn">
+            <ion-item routerDirection="root" routerLink="/comandas" lines="none" detail="false" routerLinkActive="selected">
+              <ion-icon slot="start" name="receipt-outline"></ion-icon>
+              <ion-label>Comandas</ion-label>
+            </ion-item>
+          </ion-menu-toggle>
+
           <ion-menu-toggle auto-hide="false" *ngIf="isAdmin">
             <ion-item routerDirection="root" routerLink="/admin-dashboard" lines="none" detail="false" routerLinkActive="selected">
               <ion-icon name="stats-chart-outline"></ion-icon>

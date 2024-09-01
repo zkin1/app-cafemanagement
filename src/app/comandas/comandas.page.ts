@@ -1,7 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ToastController } from '@ionic/angular';
+import { IonicModule } from '@ionic/angular';
+
 interface OrderItem {
   name: string;
   cantidad: number;
@@ -25,8 +26,10 @@ interface Orden {
 })
 export class ComandasPage implements OnInit {
   ordenes: Orden[] = [];
+  toastMessage: string = '';
+  showToast: boolean = false;
 
-  constructor(private toastController: ToastController) { }
+  constructor() { }
 
   ngOnInit() {
     this.cargarOrdenes();
@@ -42,18 +45,17 @@ export class ComandasPage implements OnInit {
         ], 
         estado: 'pendiente', 
         total: 8000,
-        nota: 'Sin azucar, por favor'
+        nota: 'Sin azucar'
       },
       { 
         id: 2, 
         numeroMesa: 5, 
         items: [
-          { name: 'Cappuccino', cantidad: 1, tipoLeche: 'soya', tamano: 'mediano' }, 
-          { name: 'Croissant', cantidad: 1 }
+          { name: 'Cappuccino', cantidad: 1, tipoLeche: 'soya', tamano: 'mediano' }
         ], 
         estado: 'en proceso', 
         total: 9500,
-        nota: 'Calentar el croissant'
+        nota: 'rapido que ando apurao'
       },
       { 
         id: 3, 
@@ -72,12 +74,11 @@ export class ComandasPage implements OnInit {
     this.mostrarToast(`Orden #${orden.id} marcada como ${nuevoEstado}`);
   }
 
-  async mostrarToast(mensaje: string) {
-    const toast = await this.toastController.create({
-      message: mensaje,
-      duration: 2000,
-      position: 'bottom'
-    });
-    toast.present();
+  mostrarToast(mensaje: string) {
+    this.toastMessage = mensaje;
+    this.showToast = true;
+    setTimeout(() => {
+      this.showToast = false;
+    }, 2000);
   }
 }

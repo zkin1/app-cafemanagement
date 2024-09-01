@@ -1,8 +1,24 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { IonicModule, ToastController } from '@ionic/angular';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { Router } from '@angular/router';
+
+interface CartItem {
+  name: string;
+  description: string;
+  price: number;
+  image: string;
+  selectedSize: string;
+  selectedMilk: string;
+  quantity: number;
+  finalPrice: number;
+}
+
+interface Order {
+  orderNumber: number;
+  items: CartItem[];
+  tableNumber: number | null;
+  note: string;
+  total: number;
+}
 
 @Component({
   selector: 'app-carro-compras',
@@ -10,50 +26,67 @@ import { Router } from '@angular/router';
   styleUrls: ['./carro-compras.page.scss'],
 })
 export class CarroComprasPage implements OnInit {
-  items: any[] = [];
-  orderNumber: number = 0;
-  note: string = '';
-  tableNumber: number | null = null;
+  currentOrder: Order = {
+    orderNumber: 0,
+    items: [],
+    tableNumber: null,
+    note: '',
+    total: 0
+  };
 
-  constructor(
-    private toastController: ToastController,
-    private router: Router
-  ) { }
+  toastMessage: string = '';
+  showToast: boolean = false;
+
+  constructor(private router: Router, private cdr: ChangeDetectorRef) { }
 
   ngOnInit() {
-    // Recuperar la última orden (simulado)
+    this.loadOrder();
+  }
+
+  loadOrder() {
     const lastOrder = (window as any).lastOrder;
     if (lastOrder) {
-      this.items = lastOrder.items;
-      this.orderNumber = lastOrder.orderNumber;
+      this.currentOrder = lastOrder;
+    } else {
+      this.simulateOrder();
     }
+    this.calculateTotal();
   }
 
-  getTotalPrice() {
-    return this.items.reduce((total, item) => total + item.finalPrice, 0);
+  simulateOrder() {
+    this.currentOrder.orderNumber = Math.floor(Math.random() * 1000) + 1;
+    this.currentOrder.items = [{
+      name: 'Latte',
+      description: 'Espresso con leche cremosa',
+      price: 6000,
+      image: 'assets/latte.jpg',
+      selectedSize: 'grande',
+      selectedMilk: 'soya',
+      quantity: 1,
+      finalPrice: 7000 
+    }];
   }
 
-  async confirmarOrden() {
-    // Aquí puedes agregar la lógica para procesar la orden
-    console.log('Orden confirmada:', {
-      orderNumber: this.orderNumber,
-      items: this.items,
-      tableNumber: this.tableNumber,
-      note: this.note,
-      total: this.getTotalPrice()
-    });
+  calculateTotal() {
+    this.currentOrder.total = this.currentOrder.items.reduce((total, item) => total + item.finalPrice * item.quantity, 0);
+  }
 
-    // Mostrar un mensaje de confirmación
-    const toast = await this.toastController.create({
-      message: 'Orden confirmada con éxito',
-      duration: 2000,
-      position: 'bottom',
-      color: 'success'
-    });
-    toast.present();
+  confirmarOrden() {
+    console.log('Orden confirmada:', this.currentOrder);
+    this.presentToast('Orden confirmada con éxito');
+    setTimeout(() => {
+      (window as any).lastOrder = null;
+      this.router.navigate(['/main']);
+    }, 3000);
+  }
 
-    // Limpiar el carrito y redirigir a la página principal
-    (window as any).lastOrder = null;
-    this.router.navigate(['/main']);
+  presentToast(message: string) {
+    this.toastMessage = message;
+    this.showToast = true;
+    this.cdr.detectChanges(); 
+    setTimeout(() => {
+      this.showToast = false;
+      this.cdr.detectChanges(); 
+    }, 3000);
   }
 }

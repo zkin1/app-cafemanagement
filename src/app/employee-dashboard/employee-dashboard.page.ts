@@ -27,7 +27,6 @@ export class EmployeeDashboardPage implements OnInit {
   }
 
   logout() {
-    // Lógica de cierre de sesión
     (window as any).currentUser = null;
     this.router.navigate(['/login']);
   }

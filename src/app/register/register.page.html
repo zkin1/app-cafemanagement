@@ -20,3 +20,10 @@
     <a [routerLink]="['/login']" class="login-link">¿Ya tienes una cuenta? Inicia sesión</a>
   </div>
 </ion-content>
+<ion-toast
+[isOpen]="showToast"
+[message]="toastMessage"
+[duration]="3000"
+position="top"
+color="primary"
+></ion-toast>

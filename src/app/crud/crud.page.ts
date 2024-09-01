@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ToastController } from '@ionic/angular';
+import { IonicModule } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { addCircleOutline, createOutline, trashOutline, listOutline } from 'ionicons/icons';
 
@@ -23,8 +23,10 @@ export class CrudPage implements OnInit {
   currentProduct: Product = { id: 0, name: '', description: '', price: 0, image: '' };
   isEditing = false;
   activeSection: 'add' | 'edit' | 'delete' | 'view' = 'view';
+  toastMessage: string = '';
+  showToast: boolean = false;
 
-  constructor(private toastController: ToastController) {
+  constructor() {
     addIcons({ addCircleOutline, createOutline, trashOutline, listOutline });
   }
   
@@ -72,13 +74,12 @@ export class CrudPage implements OnInit {
     this.isEditing = false;
   }
 
-  async presentToast(message: string) {
-    const toast = await this.toastController.create({
-      message: message,
-      duration: 2000,
-      position: 'bottom'
-    });
-    toast.present();
+  presentToast(message: string) {
+    this.toastMessage = message;
+    this.showToast = true;
+    setTimeout(() => {
+      this.showToast = false;
+    }, 3000);
   }
 
   setActiveSection(section: 'add' | 'edit' | 'delete' | 'view') {

@@ -1,4 +1,5 @@
 <ion-header>
+
   <ion-toolbar>
     <ion-buttons slot="start">
       <ion-menu-button></ion-menu-button>
@@ -67,3 +68,11 @@
     </ion-button>
   </ion-toolbar>
 </ion-footer>
+
+<ion-toast
+[isOpen]="showToast"
+[message]="toastMessage"
+[duration]="3000"
+position="top"
+color="primary"
+></ion-toast>

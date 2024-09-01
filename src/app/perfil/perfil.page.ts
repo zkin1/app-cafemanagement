@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ToastController } from '@ionic/angular';
+import { IonicModule } from '@ionic/angular';
 import { RouterLink, Router } from '@angular/router';
 
 @Component({
@@ -17,11 +17,10 @@ export class PerfilPage implements OnInit {
     confirmarContrasena: ''
   };
   esAdmin: boolean = false;
+  toastMessage: string = '';
+  showToast: boolean = false;
 
-  constructor(
-    private toastController: ToastController,
-    private router: Router
-  ) {}
+  constructor(private router: Router) {}
 
   ngOnInit() {
     // Simular la obtención de datos del usuario
@@ -35,37 +34,27 @@ export class PerfilPage implements OnInit {
     }
   }
 
-  async updatePerfil() {
+  updatePerfil() {
     console.log('Perfil actualizado', this.usuario);
     (window as any).currentUser = { ...(window as any).currentUser, ...this.usuario };
-    await this.presentarToast('Perfil actualizado con éxito');
+    this.presentToast('Perfil actualizado con éxito');
   }
 
-  async cambiarContrasena() {
+  cambiarContrasena() {
     if (this.datosContrasena.nuevaContrasena !== this.datosContrasena.confirmarContrasena) {
-      await this.presentarToast('Las contraseñas no coinciden', 'danger');
+      this.presentToast('Las contraseñas no coinciden');
       return;
     }
     console.log('Contraseña cambiada');
-    await this.presentarToast('Contraseña cambiada con éxito');
+    this.presentToast('Contraseña cambiada con éxito');
     this.datosContrasena = { contrasenaActual: '', nuevaContrasena: '', confirmarContrasena: '' };
   }
 
-  async gestionarUsuarios() {
-    console.log('Gestionar usuarios');
-  }
-
-  async verRegistros() {
-    console.log('Ver registros');
-  }
-
-  async presentarToast(mensaje: string, color: 'success' | 'danger' = 'success') {
-    const toast = await this.toastController.create({
-      message: mensaje,
-      duration: 2000,
-      position: 'bottom',
-      color: color
-    });
-    toast.present();
+  presentToast(message: string) {
+    this.toastMessage = message;
+    this.showToast = true;
+    setTimeout(() => {
+      this.showToast = false;
+    }, 3000);
   }
 }

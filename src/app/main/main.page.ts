@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ToastController } from '@ionic/angular';
+import { IonicModule } from '@ionic/angular';
 import { RouterLink, Router } from '@angular/router';
 import { trigger, state, style, animate, transition } from '@angular/animations';
 
@@ -64,19 +64,19 @@ export class MainPage implements OnInit {
 
   currentOrderNumber: number = 1;
   currentOrderItems: any[] = [];
+  toastMessage: string = '';
+  showToast: boolean = false;
 
-
-constructor(
-    private toastController: ToastController,
-    private router: Router
-  ) {}
+  constructor(private router: Router) {}
 
   ngOnInit() {
     console.log('MainPage ngOnInit');
   }
+
   get isLoggedIn(): boolean {
     return !!(window as any).currentUser;
   }
+
   get currentUserName(): string | null {
     return (window as any).currentUser?.name || null;
   }
@@ -96,26 +96,19 @@ constructor(
   }
 
   updatePrice(product: Product) {
+    // La lógica para actualizar el precio puede ir aquí si es necesario
   }
 
-  async addToCart(product: Product) {
+  addToCart(product: Product) {
     if (!this.isLoggedIn) {
-      const toast = await this.toastController.create({
-        message: 'Por favor, inicia sesión para añadir productos al carrito',
-        duration: 2000,
-        position: 'top',
-        color: 'warning'
-      });
-      toast.present();
+      this.presentToast('Por favor, inicia sesión para añadir productos al carrito');
       return;
     }
-
 
     this.currentOrderItems.push({
       ...product,
       finalPrice: this.calculatePrice(product)
     });
-
 
     console.log('Producto añadido al carrito:', {
       ...product,
@@ -123,21 +116,25 @@ constructor(
     });
     product.showOptions = false;
 
-    const toast = await this.toastController.create({
-      message: `${product.name} (${product.selectedSize}, ${product.selectedMilk}) añadido a la orden #${this.currentOrderNumber}`,
-      duration: 2000,
-      position: 'top',
-      color: 'success'
-    });
-    toast.present();
+    this.presentToast(`${product.name} (${product.selectedSize}, ${product.selectedMilk}) añadido a la orden #${this.currentOrderNumber}`);
   }
 
   completeOrder() {
-    // Guardar la orden actual en algún lugar (simulaciooooooooooon
+    // Guardar la orden actual en algún lugar (simulación)
     (window as any).lastOrder = {
       orderNumber: this.currentOrderNumber,
       items: this.currentOrderItems
     };
-  };
-
+    
+    // Redirigir al carrito de compras
+    this.router.navigate(['/carro-compras']);
   }
+
+  presentToast(message: string) {
+    this.toastMessage = message;
+    this.showToast = true;
+    setTimeout(() => {
+      this.showToast = false;
+    }, 3000);
+  }
+}

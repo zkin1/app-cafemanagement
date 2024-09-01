@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ToastController } from '@ionic/angular';
+import { IonicModule } from '@ionic/angular';
 
 interface User {
   id: number;
@@ -23,8 +23,10 @@ export class EmployeeManagementPage implements OnInit {
   ];
 
   editingUser: User | null = null;
+  toastMessage: string = '';
+  showToast: boolean = false;
 
-  constructor(private toastController: ToastController) { }
+  constructor() { }
 
   ngOnInit() {
   }
@@ -48,12 +50,11 @@ export class EmployeeManagementPage implements OnInit {
     this.editingUser = null;
   }
 
-  async presentToast(message: string) {
-    const toast = await this.toastController.create({
-      message: message,
-      duration: 2000,
-      position: 'bottom'
-    });
-    toast.present();
+  presentToast(message: string) {
+    this.toastMessage = message;
+    this.showToast = true;
+    setTimeout(() => {
+      this.showToast = false;
+    }, 3000);
   }
 }
