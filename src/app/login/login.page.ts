@@ -31,6 +31,7 @@ export class LoginPage {
   
     try {
       const user = await this.databaseService.authenticateUser(this.email, this.password);
+      console.log('Authentication response:', user); // Log para depuración
       if (user) {
         await this.handleSuccessfulLogin(user);
       } else {
@@ -41,6 +42,7 @@ export class LoginPage {
       await this.presentToast('Ocurrió un error durante el inicio de sesión. Por favor, intente de nuevo.');
     }
   }
+
   private async handleSuccessfulLogin(user: User) {
     // Remove sensitive information before storing
     const { password, ...safeUserInfo } = user;
@@ -50,11 +52,8 @@ export class LoginPage {
     
     await this.presentToast(`Bienvenido, ${user.name}!`);
     
-    if (user.role === 'admin') {
-      this.router.navigate(['/admin-dashboard']);
-    } else {
-      this.router.navigate(['/employee-dashboard']);
-    }
+    // Navegar a la página principal
+    this.router.navigate(['/main']);
   }
 
   async presentToast(message: string) {

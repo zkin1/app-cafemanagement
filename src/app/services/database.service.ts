@@ -1,709 +1,357 @@
 import { Injectable } from '@angular/core';
-import { Capacitor } from '@capacitor/core';
-import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite';
+import { SQLite, SQLiteObject } from '@awesome-cordova-plugins/sqlite/ngx';
+import { AlertController, Platform } from '@ionic/angular';
+import { BehaviorSubject, Observable } from 'rxjs';
 import { User } from '../models/user.model';
 import { Product } from '../models/product.model';
 import { Order } from '../models/order.model';
-import { OrderDetail } from '../models/order-detail.model';
-import { SalesReport } from '../models/sales-report.model';
-import { Inventory } from '../models/inventory.model';
-import { Table } from '../models/table.model';
 
 @Injectable({
   providedIn: 'root'
 })
 export class DatabaseService {
-  private sqlite: SQLiteConnection | null = null;
-  private db: SQLiteDBConnection | null = null;
-  private initialized: boolean = false;
+  public database!: SQLiteObject;
 
+  // Definición de tablas
+  tableUser: string = `CREATE TABLE IF NOT EXISTS user(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, 
+    username TEXT NOT NULL UNIQUE, 
+    password TEXT NOT NULL, 
+    role TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE,
+    phoneNumber TEXT,
+    hireDate TEXT
+  );`;
 
-  constructor() {
-    this.initializeDatabase().catch(error => {
-      console.error('Failed to initialize database:', error);
-  
+  tableProduct: string = `CREATE TABLE IF NOT EXISTS product(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    price REAL NOT NULL,
+    category TEXT NOT NULL,
+    imageURL TEXT,
+    isAvailable INTEGER DEFAULT 1
+  );`;
+
+  tableOrder: string = `CREATE TABLE IF NOT EXISTS orders(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER,
+    tableNumber INTEGER,
+    status TEXT NOT NULL,
+    notes TEXT,
+    totalAmount REAL NOT NULL,
+    paymentMethod TEXT,
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES user(id)
+  );`;
+
+  // Inserts por defecto
+  defaultAdmin: string = `INSERT OR IGNORE INTO user(id, username, password, role, name, email) 
+    VALUES (1, 'admin', 'admin123', 'admin', 'Administrador', 'admin@cafeteria.com');`;
+
+  // BehaviorSubjects para los listados
+  listUsers = new BehaviorSubject<User[]>([]);
+  listProducts = new BehaviorSubject<Product[]>([]);
+  listOrders = new BehaviorSubject<Order[]>([]);
+
+  private isDBReady: BehaviorSubject<boolean> = new BehaviorSubject(false);
+
+  constructor(
+    private sqlite: SQLite, 
+    private platform: Platform, 
+    private alertController: AlertController
+  ) {
+    this.createDB();
+  }
+
+  async presentAlert(titulo: string, msj: string) {
+    const alert = await this.alertController.create({
+      header: titulo,
+      message: msj,
+      buttons: ['OK'],
+    });
+    await alert.present();
+  }
+
+  // Métodos para observables
+  fetchUsers(): Observable<User[]> {
+    return this.listUsers.asObservable();
+  }
+
+  fetchProducts(): Observable<Product[]> {
+    return this.listProducts.asObservable();
+  }
+
+  fetchOrders(): Observable<Order[]> {
+    return this.listOrders.asObservable();
+  }
+
+  dbState() {
+    return this.isDBReady.asObservable();
+  }
+
+  // Crear la Base de Datos
+  createDB() {
+    this.platform.ready().then(() => {
+      this.sqlite.create({
+        name: 'cafeteria.db',
+        location: 'default'
+      }).then((db: SQLiteObject) => {
+        this.database = db;
+        this.createTables();
+      }).catch(e => {
+        this.presentAlert('Base de Datos', 'Error al crear la BD: ' + JSON.stringify(e));
+      });
     });
   }
-  async updateUserPassword(userId: number, currentPassword: string, newPassword: string): Promise<boolean> {
-    await this.ensureDatabaseInitialized();
+
+  async createTables() {
     try {
-      // Primero, verificamos la contraseña actual
-      const query = `SELECT * FROM Users WHERE UserID = ? AND Password = ?`;
-      const result = await this.db!.query(query, [userId, currentPassword]);
-      
-      if (result.values && result.values.length > 0) {
-        // Si la contraseña actual es correcta, actualizamos a la nueva
-        const updateQuery = `UPDATE Users SET Password = ? WHERE UserID = ?`;
-        await this.db!.run(updateQuery, [newPassword, userId]);
-        return true;
-      } else {
-        // Si la contraseña actual no es correcta, retornamos false
-        return false;
+      await this.database.executeSql(this.tableUser, []);
+      await this.database.executeSql(this.tableProduct, []);
+      await this.database.executeSql(this.tableOrder, []);
+      await this.database.executeSql(this.defaultAdmin, []);
+      this.loadInitialData();
+      this.isDBReady.next(true);
+    } catch (e) {
+      this.presentAlert('Creación de Tablas', 'Error al crear las tablas: ' + JSON.stringify(e));
+    }
+  }
+
+  // Cargar datos iniciales
+  async loadInitialData() {
+    this.getAllUsers();
+    this.getAllProducts();
+    this.getAllOrders();
+  }
+
+  // Métodos CRUD para User
+  async getAllUsers() {
+    try {
+      const users: User[] = [];
+      const data = await this.database.executeSql('SELECT * FROM user', []);
+      for (let i = 0; i < data.rows.length; i++) {
+        users.push(data.rows.item(i));
       }
-    } catch (error) {
-      console.error('Error updating user password:', error);
-      throw error;
+      this.listUsers.next(users);
+    } catch (e) {
+      this.presentAlert('Error', 'Error al obtener usuarios: ' + JSON.stringify(e));
     }
   }
 
-  async getUserById(userId: number): Promise<User> {
-    await this.ensureDatabaseInitialized();
+  async updateUserLastLogin(userId: number) {
     try {
-      const query = `SELECT * FROM Users WHERE UserID = ?`;
-      const result = await this.db!.query(query, [userId]);
-      if (result.values && result.values.length > 0) {
-        return result.values[0] as User;
-      } else {
-        throw new Error('Usuario no encontrado');
-      }
-    } catch (error) {
-      console.error('Error getting user by ID:', error);
-      throw error;
-    }
-  }
-
-  async getUserByEmail(email: string): Promise<User | null> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `SELECT * FROM Users WHERE Email = ?`;
-      const result = await this.db!.query(query, [email]);
-      return result.values && result.values.length > 0 ? result.values[0] as User : null;
-    } catch (error) {
-      console.error('Error getting user by email:', error);
-      throw error;
-    }
-  }
-
-  async updateUserLastLogin(userId: number): Promise<void> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `UPDATE Users SET LastLogin = CURRENT_TIMESTAMP WHERE UserID = ?`;
-      await this.db!.run(query, [userId]);
-    } catch (error) {
-      console.error('Error updating user last login:', error);
-      throw error;
-    }
-  }
-  
-  public async initializeDatabase(): Promise<void> {
-    if (this.initialized) return;
-  
-    if (Capacitor.isNativePlatform()) {
-      try {
-        this.sqlite = new SQLiteConnection(CapacitorSQLite);
-        this.db = await this.sqlite.createConnection(
-          'cafeteria',
-          false,
-          'no-encryption',
-          1,
-          false
-        );
-        await this.db.open();
-        await this.createTables();
-        await this.createIndexes();
-        await this.createTriggers();
-        this.initialized = true;
-        console.log('Database initialized successfully');
-      } catch (error) {
-        console.error('Error initializing database:', error);
-        throw error;
-      }
-    } else {
-      console.warn('SQLite is not available on this platform');
-    }
-  }
-
-  private async ensureDatabaseInitialized(): Promise<void> {
-    if (!this.initialized) {
-      await this.initializeDatabase();
-    }
-    if (!this.db) {
-      throw new Error('Database connection not initialized');
-    }
-  }
-
-  private async createTables(): Promise<void> {
-    const queries = [
-      `CREATE TABLE IF NOT EXISTS Users (
-        UserID INTEGER PRIMARY KEY AUTOINCREMENT,
-        Username TEXT NOT NULL UNIQUE,
-        Password TEXT NOT NULL,
-        Role TEXT NOT NULL CHECK (Role IN ('employee', 'admin', 'manager')),
-        Name TEXT NOT NULL,
-        Email TEXT UNIQUE,
-        PhoneNumber TEXT,
-        HireDate DATE,
-        LastLogin DATETIME
-      )`,
-      `CREATE TABLE IF NOT EXISTS Products (
-        ProductID INTEGER PRIMARY KEY AUTOINCREMENT,
-        Name TEXT NOT NULL,
-        Description TEXT,
-        Price REAL NOT NULL,
-        Category TEXT NOT NULL,
-        ImageURL TEXT,
-        IsAvailable BOOLEAN DEFAULT 1,
-        CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-      )`,
-      `CREATE TABLE IF NOT EXISTS ProductCategories (
-        CategoryID INTEGER PRIMARY KEY AUTOINCREMENT,
-        Name TEXT NOT NULL UNIQUE,
-        Description TEXT
-      )`,
-      `CREATE TABLE IF NOT EXISTS Orders (
-        OrderID INTEGER PRIMARY KEY AUTOINCREMENT,
-        UserID INTEGER,
-        TableNumber INTEGER,
-        Status TEXT NOT NULL CHECK (Status IN ('Solicitado', 'En proceso', 'Listo', 'Cancelado', 'Entregado')),
-        CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        Notes TEXT,
-        TotalAmount REAL NOT NULL,
-        PaymentMethod TEXT,
-        FOREIGN KEY (UserID) REFERENCES Users(UserID)
-      )`,
-      `CREATE TABLE IF NOT EXISTS OrderDetails (
-        OrderDetailID INTEGER PRIMARY KEY AUTOINCREMENT,
-        OrderID INTEGER,
-        ProductID INTEGER,
-        Quantity INTEGER NOT NULL,
-        Size TEXT,
-        MilkType TEXT,
-        Price REAL NOT NULL,
-        FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
-        FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
-      )`,
-      `CREATE TABLE IF NOT EXISTS SalesReports (
-        ReportID INTEGER PRIMARY KEY AUTOINCREMENT,
-        Date DATE NOT NULL,
-        TotalSales REAL NOT NULL,
-        TotalOrders INTEGER NOT NULL,
-        AverageOrderValue REAL,
-        TopSellingProduct INTEGER,
-        GeneratedBy INTEGER,
-        CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (GeneratedBy) REFERENCES Users(UserID),
-        FOREIGN KEY (TopSellingProduct) REFERENCES Products(ProductID)
-      )`,
-      `CREATE TABLE IF NOT EXISTS Inventory (
-        InventoryID INTEGER PRIMARY KEY AUTOINCREMENT,
-        ProductID INTEGER,
-        Quantity INTEGER NOT NULL,
-        LastRestockedAt DATETIME,
-        FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
-      )`,
-      `CREATE TABLE IF NOT EXISTS Tables (
-        TableID INTEGER PRIMARY KEY AUTOINCREMENT,
-        TableNumber INTEGER UNIQUE NOT NULL,
-        Capacity INTEGER NOT NULL,
-        Status TEXT CHECK (Status IN ('Libre', 'Ocupada', 'Reservada'))
-      )`
-    ];
-
-    for (const query of queries) {
-      await this.db!.execute(query);
-    }
-  }
-
-  private async createIndexes(): Promise<void> {
-    const indexes = [
-      'CREATE INDEX IF NOT EXISTS idx_users_role ON Users(Role)',
-      'CREATE INDEX IF NOT EXISTS idx_products_category ON Products(Category)',
-      'CREATE INDEX IF NOT EXISTS idx_orders_status ON Orders(Status)',
-      'CREATE INDEX IF NOT EXISTS idx_orders_userid ON Orders(UserID)',
-      'CREATE INDEX IF NOT EXISTS idx_orderdetails_orderid ON OrderDetails(OrderID)',
-      'CREATE INDEX IF NOT EXISTS idx_orderdetails_productid ON OrderDetails(ProductID)',
-      'CREATE INDEX IF NOT EXISTS idx_salesreports_date ON SalesReports(Date)',
-      'CREATE INDEX IF NOT EXISTS idx_inventory_productid ON Inventory(ProductID)'
-    ];
-
-    for (const index of indexes) {
-      await this.db!.execute(index);
-    }
-  }
-
-  private async createTriggers(): Promise<void> {
-    const triggers = [
-      `CREATE TRIGGER IF NOT EXISTS update_product_timestamp 
-       AFTER UPDATE ON Products
-       BEGIN
-         UPDATE Products SET UpdatedAt = CURRENT_TIMESTAMP WHERE ProductID = NEW.ProductID;
-       END`,
-      `CREATE TRIGGER IF NOT EXISTS update_order_timestamp 
-       AFTER UPDATE ON Orders
-       BEGIN
-         UPDATE Orders SET UpdatedAt = CURRENT_TIMESTAMP WHERE OrderID = NEW.OrderID;
-       END`
-    ];
-
-    for (const trigger of triggers) {
-      await this.db!.execute(trigger);
-    }
-  }
-
-  async insertSeedData() {
-    try {
-      const currentDate = new Date();
-      // Insertar usuario administrador
-      const adminUser: User = {
-        username: 'admin',
-        password: 'admin123',
-        role: 'admin',
-        name: 'Administrador Principal',
-        email: 'admin@cafeteria.com',
-        phoneNumber: '123456789',
-        hireDate: currentDate
-      };
-      await this.createUser(adminUser);
-  
-      // Insertar empleados
-      const employees: User[] = [
-        {
-          username: 'empleado1',
-          password: 'emp123',
-          role: 'employee',
-          name: 'Juan Pérez',
-          email: 'juan@cafeteria.com',
-          phoneNumber: '987654321',
-          hireDate: currentDate
-        },
-        {
-          username: 'empleado2',
-          password: 'emp456',
-          role: 'employee',
-          name: 'María López',
-          email: 'maria@cafeteria.com',
-          phoneNumber: '987654322',
-          hireDate: currentDate
-        },
-        {
-          username: 'empleado3',
-          password: 'emp789',
-          role: 'employee',
-          name: 'Carlos Rodríguez',
-          email: 'carlos@cafeteria.com',
-          phoneNumber: '987654323',
-          hireDate: currentDate
-        }
-      ];
-  
-      for (const employee of employees) {
-        await this.createUser(employee);
-      }
-  
-      // Insertar productos
-      const products: Product[] = [
-        {
-          name: 'Café Americano',
-          description: 'Café negro tradicional',
-          price: 2500,
-          category: 'Bebidas calientes',
-          imageURL: 'assets/americano.jpg',
-          isAvailable: true
-        },
-        {
-          name: 'Cappuccino',
-          description: 'Espresso con leche espumosa',
-          price: 3000,
-          category: 'Bebidas calientes',
-          imageURL: 'assets/cappuccino.jpg',
-          isAvailable: true
-        },
-        {
-          name: 'Latte',
-          description: 'Café con leche cremosa',
-          price: 3200,
-          category: 'Bebidas calientes',
-          imageURL: 'assets/latte.jpg',
-          isAvailable: true
-        },
-        {
-          name: 'Espresso',
-          description: 'Shot de café concentrado',
-          price: 2000,
-          category: 'Bebidas calientes',
-          imageURL: 'assets/espresso.jpg',
-          isAvailable: true
-        },
-        {
-          name: 'Té Verde',
-          description: 'Té verde tradicional',
-          price: 2200,
-          category: 'Bebidas calientes',
-          imageURL: 'assets/te-verde.jpg',
-          isAvailable: true
-        }
-      ];
-  
-      for (const product of products) {
-        await this.createProduct(product);
-      }
-  
-      
-      const orders: Order[] = [
-        {
-          orderNumber: 1001,
-          userId: 2, 
-          tableNumber: 5,
-          status: 'Solicitado',
-          notes: 'Sin azúcar',
-          totalAmount: 5500,
-          paymentMethod: 'Efectivo'
-        },
-        {
-          orderNumber: 1002,
-          userId: 3,
-          tableNumber: 3,
-          status: 'En proceso',
-          notes: 'Extra caliente',
-          totalAmount: 6200,
-          paymentMethod: 'Tarjeta'
-        }
-      ];
-  
-      for (const order of orders) {
-        const orderId = await this.createOrder(order);
-        
-        // Añadir detalles a las órdenes
-        const orderDetails: OrderDetail[] = [
-          {
-            orderId: orderId,
-            productId: 1, 
-            quantity: 2,
-            size: 'Grande',
-            milkType: 'Regular',
-            price: 2500
-          },
-          {
-            orderId: orderId,
-            productId: 2, 
-            quantity: 1,
-            size: 'Mediano',
-            milkType: 'Descremada',
-            price: 3000
-          }
-        ];
-  
-        for (const detail of orderDetails) {
-          await this.addProductToOrder(detail);
-        }
-      }
-  
-      console.log('Datos de prueba insertados con éxito');
-    } catch (error) {
-      console.error('Error al insertar datos de prueba:', error);
-      throw error;
-    }
-  }
-
-  // User CRUD operations
-  async createUser(user: User): Promise<number> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `INSERT INTO Users (Username, Password, Role, Name, Email, PhoneNumber, HireDate)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`;
-      const result = await this.db!.run(query, [
-        user.username, 
-        user.password, 
-        user.role, 
-        user.name, 
-        user.email, 
-        user.phoneNumber, 
-        user.hireDate ? user.hireDate.toISOString() : null
-      ]);
-      return result.changes?.lastId ?? 0;
-    } catch (error) {
-      console.error('Error creating user:', error);
-      throw error;
-    }
-  }
-
-  async getUserByCredentials(username: string, password: string): Promise<User | null> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `SELECT * FROM Users WHERE Username = ? AND Password = ?`;
-      const result = await this.db!.query(query, [username, password]);
-      return result.values && result.values.length > 0 ? result.values[0] as User : null;
-    } catch (error) {
-      console.error('Error getting user by credentials:', error);
-      throw error;
-    }
-  }
-
-  async updateUser(user: User): Promise<void> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `UPDATE Users SET Name = ?, Email = ?, Role = ? WHERE UserID = ?`;
-      await this.db!.run(query, [user.name, user.email, user.role, user.id]);
-    } catch (error) {
-      console.error('Error updating user:', error);
-      throw error;
-    }
-  }
-
-
-  async getAllUsers(): Promise<User[]> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `SELECT * FROM Users`;
-      const result = await this.db!.query(query);
-      return result.values as User[];
-    } catch (error) {
-      console.error('Error getting all users:', error);
-      throw error;
-    }
-  }
-
-  async deleteUser(userId: number): Promise<void> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `DELETE FROM Users WHERE UserID = ?`;
-      await this.db!.run(query, [userId]);
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      throw error;
-    }
-  }
-
-  // Product CRUD operations
-  async createProduct(product: Product): Promise<number> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `INSERT INTO Products (Name, Description, Price, Category, ImageURL, IsAvailable)
-                     VALUES (?, ?, ?, ?, ?, ?)`;
-      const result = await this.db!.run(query, [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable]);
-      return result.changes?.lastId ?? 0;
-    } catch (error) {
-      console.error('Error creating product:', error);
-      throw error;
-    }
-  }
-
-  async getProductById(productId: number): Promise<Product | null> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `SELECT * FROM Products WHERE ProductID = ?`;
-      const result = await this.db!.query(query, [productId]);
-      return result.values && result.values.length > 0 ? result.values[0] as Product : null;
-    } catch (error) {
-      console.error('Error getting product by ID:', error);
-      throw error;
-    }
-  }
-
-  async updateProduct(product: Product): Promise<void> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `UPDATE Products SET Name = ?, Description = ?, Price = ?, Category = ?, ImageURL = ?, IsAvailable = ?
-                     WHERE ProductID = ?`;
-      await this.db!.run(query, [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable, product.id]);
-    } catch (error) {
-      console.error('Error updating product:', error);
-      throw error;
-    }
-  }
-
-  async getAllProducts(): Promise<Product[]> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `SELECT * FROM Products`;
-      const result = await this.db!.query(query);
-      return result.values as Product[];
-    } catch (error) {
-      console.error('Error getting all products:', error);
-      throw error;
-    }
-  }
-
-  async deleteProduct(productId: number): Promise<void> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `DELETE FROM Products WHERE ProductID = ?`;
-      await this.db!.run(query, [productId]);
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      throw error;
-    }
-  }
-
-  // Order operations
-  async createOrder(order: Order): Promise<number> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `INSERT INTO Orders (UserID, TableNumber, Status, Notes, TotalAmount, PaymentMethod)
-                     VALUES (?, ?, ?, ?, ?, ?)`;
-      const result = await this.db!.run(query, [order.userId, order.tableNumber, order.status, order.notes, order.totalAmount, order.paymentMethod]);
-      return result.changes?.lastId ?? 0;
-    } catch (error) {
-      console.error('Error creating order:', error);
-      throw error;
-    }
-  }
-
-  async getOrderById(orderId: number): Promise<Order | null> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `SELECT * FROM Orders WHERE OrderID = ?`;
-      const result = await this.db!.query(query, [orderId]);
-      return result.values && result.values.length > 0 ? result.values[0] as Order : null;
-    } catch (error) {
-      console.error('Error getting order by ID:', error);
-      throw error;
-    }
-  }
-
-  async updateOrderStatus(orderId: number, status: string): Promise<void> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `UPDATE Orders SET Status = ? WHERE OrderID = ?`;
-      await this.db!.run(query, [status, orderId]);
-    } catch (error) {
-      console.error('Error updating order status:', error);
-      throw error;
-    }
-  }
-
-  async getOrdersByStatus(statuses: string[]): Promise<Order[]> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const placeholders = statuses.map(() => '?').join(',');
-      const query = `SELECT * FROM Orders WHERE Status IN (${placeholders})`;
-      const result = await this.db!.query(query, statuses);
-      return result.values as Order[];
-    } catch (error) {
-      console.error('Error getting orders by status:', error);
-      throw error;
-    }
-  }
-  // OrderDetails operations
-  async addProductToOrder(orderDetail: OrderDetail): Promise<void> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `INSERT INTO OrderDetails (OrderID, ProductID, Quantity, Size, MilkType, Price)
-                     VALUES (?, ?, ?, ?, ?, ?)`;
-      await this.db!.run(query, [orderDetail.orderId, orderDetail.productId, orderDetail.quantity, orderDetail.size, orderDetail.milkType, orderDetail.price]);
-    } catch (error) {
-      console.error('Error adding product to order:', error);
-      throw error;
-    }
-  }
-
-  async getOrderDetails(orderId: number): Promise<OrderDetail[]> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `SELECT * FROM OrderDetails WHERE OrderID = ?`;
-      const result = await this.db!.query(query, [orderId]);
-      return result.values as OrderDetail[];
-    } catch (error) {
-      console.error('Error getting order details:', error);
-      throw error;
-    }
-  }
-
-  // SalesReport operations
-  async createSalesReport(report: SalesReport): Promise<number> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `INSERT INTO SalesReports (Date, TotalSales, TotalOrders, AverageOrderValue, TopSellingProduct, GeneratedBy)
-                     VALUES (?, ?, ?, ?, ?, ?)`;
-      const result = await this.db!.run(query, [report.date, report.totalSales, report.totalOrders, report.averageOrderValue, report.topSellingProduct, report.generatedBy]);
-      return result.changes?.lastId ?? 0;
-    } catch (error) {
-      console.error('Error creating sales report:', error);
-      throw error;
-    }
-  }
-
-  async getSalesReportsByDateRange(startDate: string, endDate: string): Promise<SalesReport[]> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `SELECT * FROM SalesReports WHERE Date BETWEEN ? AND ?`;
-      const result = await this.db!.query(query, [startDate, endDate]);
-      return result.values as SalesReport[];
-    } catch (error) {
-      console.error('Error getting sales reports by date range:', error);
-      throw error;
-    }
-  }
-
-
-  async getOrdersByEmployeeAndDate(employeeId: number, date: string): Promise<Order[]> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `
-        SELECT * FROM Orders 
-        WHERE UserID = ? AND DATE(CreatedAt) = ?
-      `;
-      const result = await this.db!.query(query, [employeeId, date]);
-      return result.values as Order[];
-    } catch (error) {
-      console.error('Error getting orders by employee and date:', error);
-      throw error;
-    }
-  }
-
-  async calculateTotalSales(startDate: string, endDate: string): Promise<number> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `
-        SELECT SUM(TotalAmount) as TotalSales 
-        FROM Orders 
-        WHERE DATE(CreatedAt) BETWEEN ? AND ?
-      `;
-      const result = await this.db!.query(query, [startDate, endDate]);
-      return result.values && result.values.length > 0 ? result.values[0].TotalSales || 0 : 0;
-    } catch (error) {
-      console.error('Error calculating total sales:', error);
-      throw error;
-    }
-  }
-
-  async getTopSellingProducts(limit: number = 5): Promise<{productId: number, name: string, totalSold: number}[]> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const query = `
-        SELECT 
-          p.ProductID as productId, 
-          p.Name as name, 
-          SUM(od.Quantity) as totalSold
-        FROM OrderDetails od
-        JOIN Products p ON od.ProductID = p.ProductID
-        GROUP BY od.ProductID
-        ORDER BY totalSold DESC
-        LIMIT ?
-      `;
-      const result = await this.db!.query(query, [limit]);
-      return result.values as {productId: number, name: string, totalSold: number}[];
-    } catch (error) {
-      console.error('Error getting top selling products:', error);
-      throw error;
-    }
-  }
-
-  async testDatabaseConnection(): Promise<boolean> {
-    await this.ensureDatabaseInitialized();
-    try {
-      const result = await this.db!.query('SELECT 1');
-      return (result.values!).length > 0;
-    } catch (error) {
-      console.error('Database connection test failed:', error);
-      return false;
+      const data = await this.database.executeSql(
+        'UPDATE Users SET LastLogin = CURRENT_TIMESTAMP WHERE UserID = ?',
+        [userId]
+      );
+      await this.getAllUsers();
+      this.presentAlert('Éxito', 'Último login del usuario actualizado correctamente');
+    } catch (e) {
+      this.presentAlert('Error', 'Error al actualizar el último login del usuario: ' + JSON.stringify(e));
     }
   }
 
   async authenticateUser(email: string, password: string): Promise<User | null> {
-    await this.ensureDatabaseInitialized();
     try {
-      const query = `SELECT * FROM Users WHERE Email = ? AND Password = ?`;
-      const result = await this.db!.query(query, [email, password]);
-      return result.values && result.values.length > 0 ? result.values[0] as User : null;
+      const result = await this.database.executeSql(
+        'SELECT * FROM Users WHERE Email = ? AND Password = ?',
+        [email, password]
+      );
+      return result.rows.length > 0 ? result.rows.item(0) as User : null;
     } catch (error) {
-      console.error('Error authenticating user:', error);
+      this.presentAlert('Error', 'Error autenticando al usuario: ' + JSON.stringify(error));
       throw error;
     }
   }
+  
+  
 
+  async addUser(user: User) {
+    try {
+      const data = await this.database.executeSql(
+        'INSERT INTO user (username, password, role, name, email, phoneNumber, hireDate) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [user.username, user.password, user.role, user.name, user.email, user.phoneNumber, user.hireDate]
+      );
+      this.getAllUsers();
+    } catch (e) {
+      this.presentAlert('Error', 'Error al añadir usuario: ' + JSON.stringify(e));
+    }
+  }
 
+  async updateUser(user: User) {
+    try {
+      const data = await this.database.executeSql(
+        'UPDATE user SET username=?, password=?, role=?, name=?, email=?, phoneNumber=?, hireDate=? WHERE id=?',
+        [user.username, user.password, user.role, user.name, user.email, user.phoneNumber, user.hireDate, user.id]
+      );
+      this.getAllUsers();
+    } catch (e) {
+      this.presentAlert('Error', 'Error al actualizar usuario: ' + JSON.stringify(e));
+    }
+  }
+
+  async deleteUser(id: number) {
+    try {
+      const data = await this.database.executeSql('DELETE FROM user WHERE id = ?', [id]);
+      this.getAllUsers();
+    } catch (e) {
+      this.presentAlert('Error', 'Error al eliminar usuario: ' + JSON.stringify(e));
+    }
+  }
+
+  // Métodos CRUD para Product
+  async getAllProducts() {
+    try {
+      const products: Product[] = [];
+      const data = await this.database.executeSql('SELECT * FROM product', []);
+      for (let i = 0; i < data.rows.length; i++) {
+        products.push(data.rows.item(i));
+      }
+      this.listProducts.next(products);
+    } catch (e) {
+      this.presentAlert('Error', 'Error al obtener productos: ' + JSON.stringify(e));
+    }
+  }
+
+  async addProduct(product: Product) {
+    try {
+      const data = await this.database.executeSql(
+        'INSERT INTO product (name, description, price, category, imageURL, isAvailable) VALUES (?, ?, ?, ?, ?, ?)',
+        [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0]
+      );
+      this.getAllProducts();
+    } catch (e) {
+      this.presentAlert('Error', 'Error al añadir producto: ' + JSON.stringify(e));
+    }
+  }
+
+  async updateProduct(product: Product) {
+    try {
+      const data = await this.database.executeSql(
+        'UPDATE product SET name=?, description=?, price=?, category=?, imageURL=?, isAvailable=? WHERE id=?',
+        [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0, product.id]
+      );
+      this.getAllProducts();
+    } catch (e) {
+      this.presentAlert('Error', 'Error al actualizar producto: ' + JSON.stringify(e));
+    }
+  }
+
+  async deleteProduct(id: number) {
+    try {
+      const data = await this.database.executeSql('DELETE FROM product WHERE id = ?', [id]);
+      this.getAllProducts();
+    } catch (e) {
+      this.presentAlert('Error', 'Error al eliminar producto: ' + JSON.stringify(e));
+    }
+  }
+
+  // Métodos CRUD para Order
+  async getAllOrders() {
+    try {
+      const orders: Order[] = [];
+      const data = await this.database.executeSql('SELECT * FROM orders', []);
+      for (let i = 0; i < data.rows.length; i++) {
+        orders.push(data.rows.item(i));
+      }
+      this.listOrders.next(orders);
+    } catch (e) {
+      this.presentAlert('Error', 'Error al obtener órdenes: ' + JSON.stringify(e));
+    }
+  }
+
+  async addOrder(order: Order) {
+    try {
+      const data = await this.database.executeSql(
+        'INSERT INTO orders (userId, tableNumber, status, notes, totalAmount, paymentMethod) VALUES (?, ?, ?, ?, ?, ?)',
+        [order.userId, order.tableNumber, order.status, order.notes, order.totalAmount, order.paymentMethod]
+      );
+      this.getAllOrders();
+    } catch (e) {
+      this.presentAlert('Error', 'Error al añadir orden: ' + JSON.stringify(e));
+    }
+  }
+
+  async updateOrder(order: Order) {
+    try {
+      const data = await this.database.executeSql(
+        'UPDATE orders SET userId=?, tableNumber=?, status=?, notes=?, totalAmount=?, paymentMethod=? WHERE id=?',
+        [order.userId, order.tableNumber, order.status, order.notes, order.totalAmount, order.paymentMethod, order.id]
+      );
+      this.getAllOrders();
+    } catch (e) {
+      this.presentAlert('Error', 'Error al actualizar orden: ' + JSON.stringify(e));
+    }
+  }
+
+  async deleteOrder(id: number) {
+    try {
+      const data = await this.database.executeSql('DELETE FROM orders WHERE id = ?', [id]);
+      this.getAllOrders();
+    } catch (e) {
+      this.presentAlert('Error', 'Error al eliminar orden: ' + JSON.stringify(e));
+    }
+  }
+
+  // Métodos adicionales útiles
+
+  async getUserById(id: number): Promise<User | undefined> {
+    try {
+      const data = await this.database.executeSql('SELECT * FROM user WHERE id = ?', [id]);
+      return data.rows.item(0);
+    } catch (e) {
+      this.presentAlert('Error', 'Error al obtener usuario por ID: ' + JSON.stringify(e));
+      return undefined;
+    }
+  }
+
+  async getProductById(id: number): Promise<Product | undefined> {
+    try {
+      const data = await this.database.executeSql('SELECT * FROM product WHERE id = ?', [id]);
+      return data.rows.item(0);
+    } catch (e) {
+      this.presentAlert('Error', 'Error al obtener producto por ID: ' + JSON.stringify(e));
+      return undefined;
+    }
+  }
+
+  async getOrderById(id: number): Promise<Order | undefined> {
+    try {
+      const data = await this.database.executeSql('SELECT * FROM orders WHERE id = ?', [id]);
+      return data.rows.item(0);
+    } catch (e) {
+      this.presentAlert('Error', 'Error al obtener orden por ID: ' + JSON.stringify(e));
+      return undefined;
+    }
+  }
+
+  async getOrdersByUserId(userId: number): Promise<Order[]> {
+    try {
+      const orders: Order[] = [];
+      const data = await this.database.executeSql('SELECT * FROM orders WHERE userId = ?', [userId]);
+      for (let i = 0; i < data.rows.length; i++) {
+        orders.push(data.rows.item(i));
+      }
+      return orders;
+    } catch (e) {
+      this.presentAlert('Error', 'Error al obtener órdenes por usuario: ' + JSON.stringify(e));
+      return [];
+    }
+  }
+
+  async getProductsByCategory(category: string): Promise<Product[]> {
+    try {
+      const products: Product[] = [];
+      const data = await this.database.executeSql('SELECT * FROM product WHERE category = ?', [category]);
+      for (let i = 0; i < data.rows.length; i++) {
+        products.push(data.rows.item(i));
+      }
+      return products;
+    } catch (e) {
+      this.presentAlert('Error', 'Error al obtener productos por categoría: ' + JSON.stringify(e));
+      return [];
+    }
+  }
 }
-
