@@ -29,7 +29,7 @@
     <form (ngSubmit)="addProduct()">
       <ion-item>
         <ion-label position="floating">Nombre</ion-label>
-        <ion-input [(ngModel)]="currentProduct.name" name="name" required></ion-input>
+        <ion-input [(ngModel)]="currentProduct.imageURL" name="image" required></ion-input>
       </ion-item>
       <ion-item>
         <ion-label position="floating">Descripción</ion-label>
@@ -41,7 +41,7 @@
       </ion-item>
       <ion-item>
         <ion-label position="floating">URL de la imagen</ion-label>
-        <ion-input [(ngModel)]="currentProduct.image" name="image" required></ion-input>
+        <ion-input [(ngModel)]="currentProduct.imageURL" name="image" required></ion-input>
       </ion-item>
       <ion-button expand="block" type="submit" class="ion-margin-top">Agregar Producto</ion-button>
     </form>
@@ -65,14 +65,14 @@
       </ion-item>
       <ion-item>
         <ion-label position="floating">URL de la imagen</ion-label>
-        <ion-input [(ngModel)]="currentProduct.image" name="image" required></ion-input>
+        <ion-input [(ngModel)]="currentProduct.imageURL" name="image" required></ion-input>
       </ion-item>
       <ion-button expand="block" type="submit" class="ion-margin-top">Actualizar Producto</ion-button>
     </form>
     <ion-list>
       <ion-item *ngFor="let product of products">
         <ion-thumbnail slot="start">
-          <img [src]="product.image" [alt]="product.name">
+          <img [src]="product.imageURL" [alt]="product.name">
         </ion-thumbnail>
         <ion-label>
           <h2>{{ product.name }}</h2>
@@ -94,7 +94,7 @@
           <h2>{{ product.name }}</h2>
           <p>Precio: {{ product.price | currency:'CLP':'symbol-narrow':'1.0-0' }}</p>
         </ion-label>
-        <ion-button slot="end" color="danger" (click)="deleteProduct(product.id)">Eliminar</ion-button>
+        <ion-button slot="end" color="danger" (click)="deleteProduct(product.id ?? 0)">Eliminar</ion-button>
       </ion-item>
     </ion-list>
   </div>
@@ -105,7 +105,7 @@
     <ion-list>
       <ion-item *ngFor="let product of products">
         <ion-thumbnail slot="start">
-          <img [src]="product.image" [alt]="product.name">
+          <img [src]="product.imageURL" [alt]="product.name">
         </ion-thumbnail>
         <ion-label>
           <h2>{{ product.name }}</h2>

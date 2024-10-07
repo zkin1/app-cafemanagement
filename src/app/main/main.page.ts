@@ -1,18 +1,15 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { IonicModule } from '@ionic/angular';
-import { RouterLink, Router } from '@angular/router';
+import { Router } from '@angular/router';
+import { DatabaseService } from '../services/database.service';
+import { ToastController, LoadingController } from '@ionic/angular';
+import { Product } from '../models/product.model';
 import { trigger, state, style, animate, transition } from '@angular/animations';
 
-interface Product {
-  name: string;
-  description: string;
-  price: number;
-  image: string;
+interface ExtendedProduct extends Product {
   showOptions: boolean;
   selectedSize: string;
   selectedMilk: string;
+  imageURL: string;
 }
 
 @Component({
@@ -32,60 +29,60 @@ interface Product {
   ]
 })
 export class MainPage implements OnInit {
-  products: Product[] = [
-    {
-      name: 'Latte',
-      description: 'Espresso con leche cremosa.',
-      price: 6000,
-      image: 'assets/latte.jpg',
-      showOptions: false,
-      selectedSize: 'medium',
-      selectedMilk: 'regular'
-    },
-    {
-      name: 'Capuchino',
-      description: 'Espresso con leche espumosa.',
-      price: 7000,
-      image: 'assets/cappuccino.jpg',
-      showOptions: false,
-      selectedSize: 'medium',
-      selectedMilk: 'regular'
-    },
-    {
-      name: 'Americano',
-      description: 'Espresso diluido con agua caliente',
-      price: 4000,
-      image: 'assets/americano.jpg',
-      showOptions: false,
-      selectedSize: 'medium',
-      selectedMilk: 'regular'
-    }
-  ];
-
+  products: ExtendedProduct[] = [];
   currentOrderNumber: number = 1;
   currentOrderItems: any[] = [];
-  toastMessage: string = '';
+  isLoading: boolean = false;
   showToast: boolean = false;
+  toastMessage: string = '';
 
-  constructor(private router: Router) {}
+  constructor(
+    private router: Router,
+    private databaseService: DatabaseService,
+    private toastController: ToastController,
+    private loadingController: LoadingController
+  ) {}
 
-  ngOnInit() {
-    console.log('MainPage ngOnInit');
+  async ngOnInit() {
+    await this.loadProducts();
+  }
+
+  async loadProducts() {
+    const loading = await this.loadingController.create({
+      message: 'Cargando productos...',
+    });
+    await loading.present();
+
+    try {
+      const dbProducts = await this.databaseService.getAllProducts();
+      this.products = dbProducts.map(product => ({
+        ...product,
+        showOptions: false,
+        selectedSize: 'medium',
+        selectedMilk: 'regular'
+      }));
+    } catch (error) {
+      console.error('Error loading products:', error);
+      await this.presentToast('Error al cargar los productos. Por favor, intente de nuevo.');
+    } finally {
+      await loading.dismiss();
+    }
   }
 
   get isLoggedIn(): boolean {
-    return !!(window as any).currentUser;
+    return !!localStorage.getItem('currentUser');
   }
 
   get currentUserName(): string | null {
-    return (window as any).currentUser?.name || null;
+    const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    return user.name || null;
   }
 
   toggleOptions(index: number) {
     this.products[index].showOptions = !this.products[index].showOptions;
   }
 
-  calculatePrice(product: Product): number {
+  calculatePrice(product: ExtendedProduct): number {
     let adjustedPrice = product.price;
     if (product.selectedSize === 'pequeño') {
       adjustedPrice -= 1000;
@@ -95,46 +92,90 @@ export class MainPage implements OnInit {
     return adjustedPrice;
   }
 
-  updatePrice(product: Product) {
+  updatePrice(product: ExtendedProduct) {
     // La lógica para actualizar el precio puede ir aquí si es necesario
   }
 
-  addToCart(product: Product) {
+  async addToCart(product: ExtendedProduct) {
     if (!this.isLoggedIn) {
-      this.presentToast('Por favor, inicia sesión para añadir productos al carrito');
+      await this.presentToast('Por favor, inicia sesión para añadir productos al carrito');
+      this.router.navigate(['/login']);
       return;
     }
 
-    this.currentOrderItems.push({
-      ...product,
-      finalPrice: this.calculatePrice(product)
-    });
+    const existingItemIndex = this.currentOrderItems.findIndex(item => 
+      item.id === product.id && 
+      item.selectedSize === product.selectedSize && 
+      item.selectedMilk === product.selectedMilk
+    );
 
-    console.log('Producto añadido al carrito:', {
-      ...product,
-      finalPrice: this.calculatePrice(product)
-    });
+    if (existingItemIndex !== -1) {
+      this.currentOrderItems[existingItemIndex].quantity += 1;
+    } else {
+      this.currentOrderItems.push({
+        ...product,
+        quantity: 1,
+        finalPrice: this.calculatePrice(product)
+      });
+    }
+
     product.showOptions = false;
 
-    this.presentToast(`${product.name} (${product.selectedSize}, ${product.selectedMilk}) añadido a la orden #${this.currentOrderNumber}`);
+    await this.presentToast(`${product.name} (${product.selectedSize}, ${product.selectedMilk}) añadido a la orden #${this.currentOrderNumber}`);
+    this.updateLocalStorage();
   }
 
-  completeOrder() {
-    // Guardar la orden actual en algún lugar (simulación)
-    (window as any).lastOrder = {
+  updateLocalStorage() {
+    localStorage.setItem('currentOrder', JSON.stringify({
       orderNumber: this.currentOrderNumber,
       items: this.currentOrderItems
-    };
-    
-    // Redirigir al carrito de compras
+    }));
+  }
+
+  async completeOrder() {
+    if (this.currentOrderItems.length === 0) {
+      await this.presentToast('El carrito está vacío. Añada productos antes de completar la orden.');
+      return;
+    }
+
+    this.updateLocalStorage();
     this.router.navigate(['/carro-compras']);
   }
 
-  presentToast(message: string) {
-    this.toastMessage = message;
-    this.showToast = true;
-    setTimeout(() => {
-      this.showToast = false;
-    }, 3000);
+  async presentToast(message: string) {
+    const toast = await this.toastController.create({
+      message: message,
+      duration: 2000,
+      position: 'top'
+    });
+    toast.present();
+  }
+
+  // Método para manejar la actualización de cantidad directamente en la página principal
+  updateQuantity(product: ExtendedProduct, change: number) {
+    const index = this.currentOrderItems.findIndex(item => 
+      item.id === product.id && 
+      item.selectedSize === product.selectedSize && 
+      item.selectedMilk === product.selectedMilk
+    );
+
+    if (index !== -1) {
+      this.currentOrderItems[index].quantity += change;
+      if (this.currentOrderItems[index].quantity <= 0) {
+        this.currentOrderItems.splice(index, 1);
+      }
+    }
+
+    this.updateLocalStorage();
+  }
+
+  // Método para obtener la cantidad actual de un producto en el carrito
+  getQuantityInCart(product: ExtendedProduct): number {
+    const item = this.currentOrderItems.find(item => 
+      item.id === product.id && 
+      item.selectedSize === product.selectedSize && 
+      item.selectedMilk === product.selectedMilk
+    );
+    return item ? item.quantity : 0;
   }
 }

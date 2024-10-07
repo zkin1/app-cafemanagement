@@ -20,7 +20,7 @@
       <ion-row>
         <ion-col size="12" size-md="6" size-lg="4" *ngFor="let product of products; let i = index">
           <ion-card class="product-card">
-            <img [src]="product.image" [alt]="product.name"/>
+            <img [src]="product.imageURL" [alt]="product.name"/>
             <ion-card-header>
               <ion-card-title>{{ product.name }}</ion-card-title>
             </ion-card-header>

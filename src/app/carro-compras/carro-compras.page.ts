@@ -1,7 +1,12 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { DatabaseService } from '../services/database.service';
+import { ToastController, LoadingController, AlertController } from '@ionic/angular';
+import { Order } from '../models/order.model';
+import { OrderDetail } from '../models/order-detail.model';
 
 interface CartItem {
+  id: number;
   name: string;
   description: string;
   price: number;
@@ -12,81 +17,157 @@ interface CartItem {
   finalPrice: number;
 }
 
-interface Order {
-  orderNumber: number;
-  items: CartItem[];
-  tableNumber: number | null;
-  note: string;
-  total: number;
-}
-
 @Component({
   selector: 'app-carro-compras',
   templateUrl: './carro-compras.page.html',
   styleUrls: ['./carro-compras.page.scss'],
 })
 export class CarroComprasPage implements OnInit {
-  currentOrder: Order = {
-    orderNumber: 0,
-    items: [],
-    tableNumber: null,
-    note: '',
-    total: 0
-  };
 
-  toastMessage: string = '';
   showToast: boolean = false;
+  toastMessage: string = '';
+  
+  currentOrder: Order & { items: CartItem[] } = {
+    orderNumber: 0,
+    id: 0,
+    userId: 0,
+    tableNumber: null,
+    status: 'Solicitado',
+    notes: '',
+    totalAmount: 0,
+    paymentMethod: '',
+    items: []
+  };
+  currentOrderItems: CartItem[] = [];
 
-  constructor(private router: Router, private cdr: ChangeDetectorRef) { }
+  constructor(
+    private router: Router,
+    private databaseService: DatabaseService,
+    private toastController: ToastController,
+    private loadingController: LoadingController,
+    private alertController: AlertController
+  ) {}
 
   ngOnInit() {
     this.loadOrder();
   }
 
   loadOrder() {
-    const lastOrder = (window as any).lastOrder;
-    if (lastOrder) {
-      this.currentOrder = lastOrder;
+    const storedOrder = JSON.parse(localStorage.getItem('currentOrder') || 'null');
+    if (storedOrder) {
+      this.currentOrder.id = storedOrder.orderNumber;
+      this.currentOrder.items = storedOrder.items;
+      this.currentOrderItems = storedOrder.items;
     } else {
-      this.simulateOrder();
+      this.router.navigate(['/main']);
     }
     this.calculateTotal();
   }
 
-  simulateOrder() {
-    this.currentOrder.orderNumber = Math.floor(Math.random() * 1000) + 1;
-    this.currentOrder.items = [{
-      name: 'Latte',
-      description: 'Espresso con leche cremosa',
-      price: 6000,
-      image: 'assets/latte.jpg',
-      selectedSize: 'grande',
-      selectedMilk: 'soya',
-      quantity: 1,
-      finalPrice: 7000 
-    }];
+  calculateTotal(): number {
+    this.currentOrder.totalAmount = this.currentOrderItems.reduce((total, item) => total + (item.finalPrice * item.quantity), 0);
+    return this.currentOrder.totalAmount;
   }
 
-  calculateTotal() {
-    this.currentOrder.total = this.currentOrder.items.reduce((total, item) => total + item.finalPrice * item.quantity, 0);
+  async updateQuantity(item: CartItem, change: number) {
+    item.quantity += change;
+    if (item.quantity <= 0) {
+      await this.removeItem(item);
+    } else {
+      this.calculateTotal();
+      this.updateLocalStorage();
+    }
   }
 
-  confirmarOrden() {
-    console.log('Orden confirmada:', this.currentOrder);
-    this.presentToast('Orden confirmada con éxito');
-    setTimeout(() => {
-      (window as any).lastOrder = null;
+  async removeItem(item: CartItem) {
+    const alert = await this.alertController.create({
+      header: 'Confirmar eliminación',
+      message: `¿Está seguro de que desea eliminar ${item.name} de su orden?`,
+      buttons: [
+        {
+          text: 'Cancelar',
+          role: 'cancel'
+        },
+        {
+          text: 'Eliminar',
+          handler: () => {
+            const index = this.currentOrderItems.indexOf(item);
+            if (index > -1) {
+              this.currentOrderItems.splice(index, 1);
+              this.calculateTotal();
+              this.updateLocalStorage();
+              this.presentToast('Producto eliminado de la orden');
+            }
+          }
+        }
+      ]
+    });
+
+    await alert.present();
+  }
+
+  updateLocalStorage() {
+    localStorage.setItem('currentOrder', JSON.stringify({
+      orderNumber: this.currentOrder.id,
+      items: this.currentOrderItems
+    }));
+  }
+
+  async confirmarOrden() {
+    if (this.currentOrderItems.length === 0) {
+      await this.presentToast('No hay productos en la orden. Añada productos antes de confirmar.');
+      return;
+    }
+
+    // Asegurarse de que tableNumber tenga un valor antes de confirmar
+    if (this.currentOrder.tableNumber === null) {
+      await this.presentToast('Por favor, seleccione un número de mesa antes de confirmar la orden.');
+      return;
+    }
+
+    const loading = await this.loadingController.create({
+      message: 'Procesando orden...',
+    });
+    await loading.present();
+
+    try {
+      // Get the current user ID from localStorage
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      this.currentOrder.userId = currentUser.id;
+
+      // Create the order in the database
+      const orderId = await this.databaseService.createOrder(this.currentOrder);
+
+      // Add order details
+      for (const item of this.currentOrderItems) {
+        const orderDetail: OrderDetail = {
+          orderId: orderId,
+          productId: item.id,
+          quantity: item.quantity,
+          size: item.selectedSize,
+          milkType: item.selectedMilk,
+          price: item.finalPrice
+        };
+        await this.databaseService.addProductToOrder(orderDetail);
+      }
+
+      await loading.dismiss();
+      await this.presentToast('Orden confirmada con éxito');
+      localStorage.removeItem('currentOrder');
       this.router.navigate(['/main']);
-    }, 3000);
+    } catch (error) {
+      console.error('Error al confirmar la orden:', error);
+      await loading.dismiss();
+      await this.presentToast('Error al confirmar la orden. Por favor, intente de nuevo.');
+    }
   }
 
-  presentToast(message: string) {
-    this.toastMessage = message;
-    this.showToast = true;
-    this.cdr.detectChanges(); 
-    setTimeout(() => {
-      this.showToast = false;
-      this.cdr.detectChanges(); 
-    }, 3000);
+  async presentToast(message: string) {
+    const toast = await this.toastController.create({
+      message: message,
+      duration: 3000,
+      position: 'top'
+    });
+    toast.present();
   }
 }

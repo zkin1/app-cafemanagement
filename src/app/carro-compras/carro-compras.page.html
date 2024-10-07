@@ -32,14 +32,14 @@
     
     <ion-item>
       <ion-label position="floating">Nota</ion-label>
-      <ion-textarea [(ngModel)]="currentOrder.note"></ion-textarea>
+      <ion-textarea [(ngModel)]="currentOrder.notes"></ion-textarea>
     </ion-item>
 
-    <ion-item class="total">
+    <ion-item class="totalAmount">
       <ion-label>
         <h2>Total</h2>
       </ion-label>
-      <ion-note slot="end" color="primary">${{ currentOrder.total.toFixed(0) }}</ion-note>
+      <ion-note slot="end" color="primary">${{ calculateTotal().toFixed(0) }}</ion-note>
     </ion-item>
   </div>
 </ion-content>
