@@ -21,6 +21,7 @@ export class DatabaseService {
   constructor() {
     this.initializeDatabase().catch(error => {
       console.error('Failed to initialize database:', error);
+  
     });
   }
   async updateUserPassword(userId: number, currentPassword: string, newPassword: string): Promise<boolean> {
@@ -690,5 +691,19 @@ export class DatabaseService {
       return false;
     }
   }
+
+  async authenticateUser(email: string, password: string): Promise<User | null> {
+    await this.ensureDatabaseInitialized();
+    try {
+      const query = `SELECT * FROM Users WHERE Email = ? AND Password = ?`;
+      const result = await this.db!.query(query, [email, password]);
+      return result.values && result.values.length > 0 ? result.values[0] as User : null;
+    } catch (error) {
+      console.error('Error authenticating user:', error);
+      throw error;
+    }
+  }
+
+
 }
 

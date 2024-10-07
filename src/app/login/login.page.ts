@@ -28,10 +28,10 @@ export class LoginPage {
       await this.presentToast('Por favor, ingrese email y contraseña.');
       return;
     }
-
+  
     try {
-      const user = await this.databaseService.getUserByEmail(this.email);
-      if (user && user.password === this.password) {
+      const user = await this.databaseService.authenticateUser(this.email, this.password);
+      if (user) {
         await this.handleSuccessfulLogin(user);
       } else {
         await this.presentToast('Credenciales incorrectas. Por favor, intente de nuevo.');
@@ -41,7 +41,6 @@ export class LoginPage {
       await this.presentToast('Ocurrió un error durante el inicio de sesión. Por favor, intente de nuevo.');
     }
   }
-
   private async handleSuccessfulLogin(user: User) {
     // Remove sensitive information before storing
     const { password, ...safeUserInfo } = user;
