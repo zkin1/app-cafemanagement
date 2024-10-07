@@ -10,12 +10,12 @@
 <ion-content class="ion-padding">
   <ion-card *ngFor="let orden of ordenes" class="orden-card">
     <ion-card-header>
-      <ion-card-title>Orden #{{ orden.id }} - Mesa {{ orden.numeroMesa }}</ion-card-title>
+      <ion-card-title>Orden #{{ orden.id }} - Mesa {{ orden.tableNumber }}</ion-card-title>
       <ion-card-subtitle>
-        <ion-badge [color]="orden.estado === 'pendiente' ? 'warning' : 
-                            orden.estado === 'en proceso' ? 'primary' : 
-                            orden.estado === 'lista' ? 'success' : 'danger'">
-          {{ orden.estado }}
+        <ion-badge [color]="orden.status=== 'Solicitado' ? 'warning' : 
+                            orden.status=== 'En proceso' ? 'primary' : 
+                            orden.status=== 'Listo' ? 'success' : 'danger'">
+          {{ orden.status}}
         </ion-badge>
       </ion-card-subtitle>
     </ion-card-header>
@@ -23,28 +23,28 @@
     <ion-card-content>
       <div class="items-list">
         <p *ngFor="let item of orden.items">
-          {{ item.name }} x{{ item.cantidad }}
-          <span *ngIf="item.tipoLeche || item.tamano" class="item-details">
-            ({{ item.tamano || 'Tamano estandar' }}
-            <ng-container *ngIf="item.tipoLeche">, leche {{ item.tipoLeche }}</ng-container>)
+          {{ item.name }} x{{ item.quantity }}
+          <span *ngIf="item.milkType || item.size" class="item-details">
+            ({{ item.size || 'Tamano estandar' }}
+            <ng-container *ngIf="item.milkType">, leche {{ item.milkType }}</ng-container>)
           </span>
         </p>
       </div>
-      <p class="total">Total: {{ orden.total | currency:'CLP':'symbol-narrow':'1.0-0' }}</p>
-      <p *ngIf="orden.nota" class="nota">
+      <p class="totalAmount">totalAmount: {{ orden.totalAmount | currency:'CLP':'symbol-narrow':'1.0-0' }}</p>
+      <p *ngIf="orden.notes" class="notes">
         <ion-icon name="create-outline"></ion-icon>
-        Nota: {{ orden.nota }}
+        notes: {{ orden.notes }}
       </p>
     </ion-card-content>
 
     <div class="action-buttons">
-      <ion-button [disabled]="orden.estado !== 'pendiente'" (click)="cambiarEstado(orden, 'en proceso')" color="primary">
+      <ion-button [disabled]="orden.status !== 'Solicitado'" (click)="cambiarEstado(orden, 'En proceso')" color="primary">
         En Proceso
       </ion-button>
-      <ion-button [disabled]="orden.estado !== 'en proceso'" (click)="cambiarEstado(orden, 'lista')" color="success">
+      <ion-button [disabled]="orden.status !== 'En proceso'" (click)="cambiarEstado(orden, 'Listo')" color="success">
         Lista
       </ion-button>
-      <ion-button [disabled]="orden.estado === 'cancelada'" (click)="cambiarEstado(orden, 'cancelada')" color="danger">
+      <ion-button [disabled]="orden.status === 'Cancelado'" (click)="cambiarEstado(orden, 'Cancelado')" color="danger">
         Cancelar
       </ion-button>
     </div>

@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { IonicModule } from '@ionic/angular';
-import { RouterLink, Router } from '@angular/router';
+import { DatabaseService } from '../services/database.service';
+import { ToastController, LoadingController, AlertController } from '@ionic/angular';
+import { Router } from '@angular/router';
+import { User } from '../models/user.model';
 
 @Component({
   selector: 'app-perfil',
@@ -10,51 +10,149 @@ import { RouterLink, Router } from '@angular/router';
   styleUrls: ['./perfil.page.scss'],
 })
 export class PerfilPage implements OnInit {
-  usuario: any = {};
+  showToast: boolean = false;
+  toastMessage: string = '';
+
+  
+  usuario: User = {} as User;
   datosContrasena = {
     contrasenaActual: '',
     nuevaContrasena: '',
     confirmarContrasena: ''
   };
   esAdmin: boolean = false;
-  toastMessage: string = '';
-  showToast: boolean = false;
 
-  constructor(private router: Router) {}
+  constructor(
+    private databaseService: DatabaseService,
+    private toastController: ToastController,
+    private loadingController: LoadingController,
+    private alertController: AlertController,
+    private router: Router
+  ) { }
 
-  ngOnInit() {
-    // Simular la obtención de datos del usuario
-    const usuarioActual = (window as any).currentUser;
-    if (usuarioActual) {
-      this.usuario = { ...usuarioActual };
-      this.esAdmin = usuarioActual.role === 'admin';
-    } else {
-      // Redirigir al login si no hay usuario
+  async ngOnInit() {
+    await this.cargarPerfilUsuario();
+  }
+
+  async cargarPerfilUsuario() {
+    const loading = await this.loadingController.create({
+      message: 'Cargando perfil...',
+    });
+    await loading.present();
+
+    try {
+      const userId = this.obtenerIdUsuarioActual();
+      if (!userId) {
+        throw new Error('No se encontró un usuario activo');
+      }
+
+      this.usuario = await this.databaseService.getUserById(userId);
+      this.esAdmin = this.usuario.role === 'admin';
+    } catch (error) {
+      console.error('Error al cargar el perfil del usuario:', error);
+      await this.presentToast('Error al cargar el perfil. Por favor, intente de nuevo.');
       this.router.navigate(['/login']);
+    } finally {
+      await loading.dismiss();
     }
   }
 
-  updatePerfil() {
-    console.log('Perfil actualizado', this.usuario);
-    (window as any).currentUser = { ...(window as any).currentUser, ...this.usuario };
-    this.presentToast('Perfil actualizado con éxito');
+  async updatePerfil() {
+    const loading = await this.loadingController.create({
+      message: 'Actualizando perfil...',
+    });
+    await loading.present();
+
+    try {
+      await this.databaseService.updateUser(this.usuario);
+      await this.presentToast('Perfil actualizado con éxito');
+    } catch (error) {
+      console.error('Error al actualizar el perfil:', error);
+      await this.presentToast('Error al actualizar el perfil. Por favor, intente de nuevo.');
+    } finally {
+      await loading.dismiss();
+    }
   }
 
-  cambiarContrasena() {
+  async cambiarContrasena() {
     if (this.datosContrasena.nuevaContrasena !== this.datosContrasena.confirmarContrasena) {
-      this.presentToast('Las contraseñas no coinciden');
+      await this.presentToast('Las contraseñas no coinciden');
       return;
     }
-    console.log('Contraseña cambiada');
-    this.presentToast('Contraseña cambiada con éxito');
-    this.datosContrasena = { contrasenaActual: '', nuevaContrasena: '', confirmarContrasena: '' };
+
+    const alert = await this.alertController.create({
+      header: 'Confirmar cambio de contraseña',
+      message: '¿Estás seguro de que quieres cambiar tu contraseña?',
+      buttons: [
+        {
+          text: 'Cancelar',
+          role: 'cancel'
+        },
+        {
+          text: 'Confirmar',
+          handler: async () => {
+            const loading = await this.loadingController.create({
+              message: 'Cambiando contraseña...',
+            });
+            await loading.present();
+
+            try {
+              // Asumiendo que updateUser puede manejar el cambio de contraseña
+              this.usuario.password = this.datosContrasena.nuevaContrasena;
+              await this.databaseService.updateUser(this.usuario);
+              
+              await this.presentToast('Contraseña cambiada con éxito');
+              this.datosContrasena = { contrasenaActual: '', nuevaContrasena: '', confirmarContrasena: '' };
+            } catch (error) {
+              console.error('Error al cambiar la contraseña:', error);
+              await this.presentToast('Error al cambiar la contraseña. Por favor, intente de nuevo.');
+            } finally {
+              await loading.dismiss();
+            }
+          }
+        }
+      ]
+    });
+
+    await alert.present();
   }
 
-  presentToast(message: string) {
-    this.toastMessage = message;
-    this.showToast = true;
-    setTimeout(() => {
-      this.showToast = false;
-    }, 3000);
+  async presentToast(message: string) {
+    const toast = await this.toastController.create({
+      message: message,
+      duration: 2000,
+      position: 'top'
+    });
+    await toast.present();
+  }
+
+  private obtenerIdUsuarioActual(): number | null {
+    const usuarioActual = localStorage.getItem('currentUser');
+    if (usuarioActual) {
+      return JSON.parse(usuarioActual).id;
+    }
+    return null;
+  }
+
+  async logout() {
+    const alert = await this.alertController.create({
+      header: 'Cerrar sesión',
+      message: '¿Estás seguro de que quieres cerrar sesión?',
+      buttons: [
+        {
+          text: 'Cancelar',
+          role: 'cancel'
+        },
+        {
+          text: 'Sí, cerrar sesión',
+          handler: () => {
+            localStorage.removeItem('currentUser');
+            this.router.navigate(['/login']);
+          }
+        }
+      ]
+    });
+
+    await alert.present();
   }
 }

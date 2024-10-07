@@ -17,15 +17,76 @@ export class DatabaseService {
   private db: SQLiteDBConnection | null = null;
   private initialized: boolean = false;
 
+
   constructor() {
     this.initializeDatabase().catch(error => {
       console.error('Failed to initialize database:', error);
     });
   }
+  async updateUserPassword(userId: number, currentPassword: string, newPassword: string): Promise<boolean> {
+    await this.ensureDatabaseInitialized();
+    try {
+      // Primero, verificamos la contraseña actual
+      const query = `SELECT * FROM Users WHERE UserID = ? AND Password = ?`;
+      const result = await this.db!.query(query, [userId, currentPassword]);
+      
+      if (result.values && result.values.length > 0) {
+        // Si la contraseña actual es correcta, actualizamos a la nueva
+        const updateQuery = `UPDATE Users SET Password = ? WHERE UserID = ?`;
+        await this.db!.run(updateQuery, [newPassword, userId]);
+        return true;
+      } else {
+        // Si la contraseña actual no es correcta, retornamos false
+        return false;
+      }
+    } catch (error) {
+      console.error('Error updating user password:', error);
+      throw error;
+    }
+  }
 
-  private async initializeDatabase(): Promise<void> {
+  async getUserById(userId: number): Promise<User> {
+    await this.ensureDatabaseInitialized();
+    try {
+      const query = `SELECT * FROM Users WHERE UserID = ?`;
+      const result = await this.db!.query(query, [userId]);
+      if (result.values && result.values.length > 0) {
+        return result.values[0] as User;
+      } else {
+        throw new Error('Usuario no encontrado');
+      }
+    } catch (error) {
+      console.error('Error getting user by ID:', error);
+      throw error;
+    }
+  }
+
+  async getUserByEmail(email: string): Promise<User | null> {
+    await this.ensureDatabaseInitialized();
+    try {
+      const query = `SELECT * FROM Users WHERE Email = ?`;
+      const result = await this.db!.query(query, [email]);
+      return result.values && result.values.length > 0 ? result.values[0] as User : null;
+    } catch (error) {
+      console.error('Error getting user by email:', error);
+      throw error;
+    }
+  }
+
+  async updateUserLastLogin(userId: number): Promise<void> {
+    await this.ensureDatabaseInitialized();
+    try {
+      const query = `UPDATE Users SET LastLogin = CURRENT_TIMESTAMP WHERE UserID = ?`;
+      await this.db!.run(query, [userId]);
+    } catch (error) {
+      console.error('Error updating user last login:', error);
+      throw error;
+    }
+  }
+  
+  public async initializeDatabase(): Promise<void> {
     if (this.initialized) return;
-
+  
     if (Capacitor.isNativePlatform()) {
       try {
         this.sqlite = new SQLiteConnection(CapacitorSQLite);
@@ -41,6 +102,7 @@ export class DatabaseService {
         await this.createIndexes();
         await this.createTriggers();
         this.initialized = true;
+        console.log('Database initialized successfully');
       } catch (error) {
         console.error('Error initializing database:', error);
         throw error;
@@ -179,13 +241,176 @@ export class DatabaseService {
     }
   }
 
+  async insertSeedData() {
+    try {
+      const currentDate = new Date();
+      // Insertar usuario administrador
+      const adminUser: User = {
+        username: 'admin',
+        password: 'admin123',
+        role: 'admin',
+        name: 'Administrador Principal',
+        email: 'admin@cafeteria.com',
+        phoneNumber: '123456789',
+        hireDate: currentDate
+      };
+      await this.createUser(adminUser);
+  
+      // Insertar empleados
+      const employees: User[] = [
+        {
+          username: 'empleado1',
+          password: 'emp123',
+          role: 'employee',
+          name: 'Juan Pérez',
+          email: 'juan@cafeteria.com',
+          phoneNumber: '987654321',
+          hireDate: currentDate
+        },
+        {
+          username: 'empleado2',
+          password: 'emp456',
+          role: 'employee',
+          name: 'María López',
+          email: 'maria@cafeteria.com',
+          phoneNumber: '987654322',
+          hireDate: currentDate
+        },
+        {
+          username: 'empleado3',
+          password: 'emp789',
+          role: 'employee',
+          name: 'Carlos Rodríguez',
+          email: 'carlos@cafeteria.com',
+          phoneNumber: '987654323',
+          hireDate: currentDate
+        }
+      ];
+  
+      for (const employee of employees) {
+        await this.createUser(employee);
+      }
+  
+      // Insertar productos
+      const products: Product[] = [
+        {
+          name: 'Café Americano',
+          description: 'Café negro tradicional',
+          price: 2500,
+          category: 'Bebidas calientes',
+          imageURL: 'assets/americano.jpg',
+          isAvailable: true
+        },
+        {
+          name: 'Cappuccino',
+          description: 'Espresso con leche espumosa',
+          price: 3000,
+          category: 'Bebidas calientes',
+          imageURL: 'assets/cappuccino.jpg',
+          isAvailable: true
+        },
+        {
+          name: 'Latte',
+          description: 'Café con leche cremosa',
+          price: 3200,
+          category: 'Bebidas calientes',
+          imageURL: 'assets/latte.jpg',
+          isAvailable: true
+        },
+        {
+          name: 'Espresso',
+          description: 'Shot de café concentrado',
+          price: 2000,
+          category: 'Bebidas calientes',
+          imageURL: 'assets/espresso.jpg',
+          isAvailable: true
+        },
+        {
+          name: 'Té Verde',
+          description: 'Té verde tradicional',
+          price: 2200,
+          category: 'Bebidas calientes',
+          imageURL: 'assets/te-verde.jpg',
+          isAvailable: true
+        }
+      ];
+  
+      for (const product of products) {
+        await this.createProduct(product);
+      }
+  
+      
+      const orders: Order[] = [
+        {
+          orderNumber: 1001,
+          userId: 2, 
+          tableNumber: 5,
+          status: 'Solicitado',
+          notes: 'Sin azúcar',
+          totalAmount: 5500,
+          paymentMethod: 'Efectivo'
+        },
+        {
+          orderNumber: 1002,
+          userId: 3,
+          tableNumber: 3,
+          status: 'En proceso',
+          notes: 'Extra caliente',
+          totalAmount: 6200,
+          paymentMethod: 'Tarjeta'
+        }
+      ];
+  
+      for (const order of orders) {
+        const orderId = await this.createOrder(order);
+        
+        // Añadir detalles a las órdenes
+        const orderDetails: OrderDetail[] = [
+          {
+            orderId: orderId,
+            productId: 1, 
+            quantity: 2,
+            size: 'Grande',
+            milkType: 'Regular',
+            price: 2500
+          },
+          {
+            orderId: orderId,
+            productId: 2, 
+            quantity: 1,
+            size: 'Mediano',
+            milkType: 'Descremada',
+            price: 3000
+          }
+        ];
+  
+        for (const detail of orderDetails) {
+          await this.addProductToOrder(detail);
+        }
+      }
+  
+      console.log('Datos de prueba insertados con éxito');
+    } catch (error) {
+      console.error('Error al insertar datos de prueba:', error);
+      throw error;
+    }
+  }
+
   // User CRUD operations
   async createUser(user: User): Promise<number> {
     await this.ensureDatabaseInitialized();
     try {
       const query = `INSERT INTO Users (Username, Password, Role, Name, Email, PhoneNumber, HireDate)
                      VALUES (?, ?, ?, ?, ?, ?, ?)`;
-      const result = await this.db!.run(query, [user.username, user.password, user.role, user.name, user.email, user.phoneNumber, user.hireDate]);
+      const result = await this.db!.run(query, [
+        user.username, 
+        user.password, 
+        user.role, 
+        user.name, 
+        user.email, 
+        user.phoneNumber, 
+        user.hireDate ? user.hireDate.toISOString() : null
+      ]);
       return result.changes?.lastId ?? 0;
     } catch (error) {
       console.error('Error creating user:', error);
@@ -208,14 +433,14 @@ export class DatabaseService {
   async updateUser(user: User): Promise<void> {
     await this.ensureDatabaseInitialized();
     try {
-      const query = `UPDATE Users SET Username = ?, Password = ?, Role = ?, Name = ?, Email = ?, PhoneNumber = ?, HireDate = ?
-                     WHERE UserID = ?`;
-      await this.db!.run(query, [user.username, user.password, user.role, user.name, user.email, user.phoneNumber, user.hireDate, user.id]);
+      const query = `UPDATE Users SET Name = ?, Email = ?, Role = ? WHERE UserID = ?`;
+      await this.db!.run(query, [user.name, user.email, user.role, user.id]);
     } catch (error) {
       console.error('Error updating user:', error);
       throw error;
     }
   }
+
 
   async getAllUsers(): Promise<User[]> {
     await this.ensureDatabaseInitialized();
@@ -338,18 +563,18 @@ export class DatabaseService {
     }
   }
 
-  async getOrdersByStatus(status: string): Promise<Order[]> {
+  async getOrdersByStatus(statuses: string[]): Promise<Order[]> {
     await this.ensureDatabaseInitialized();
     try {
-      const query = `SELECT * FROM Orders WHERE Status = ?`;
-      const result = await this.db!.query(query, [status]);
+      const placeholders = statuses.map(() => '?').join(',');
+      const query = `SELECT * FROM Orders WHERE Status IN (${placeholders})`;
+      const result = await this.db!.query(query, statuses);
       return result.values as Order[];
     } catch (error) {
       console.error('Error getting orders by status:', error);
       throw error;
     }
   }
-
   // OrderDetails operations
   async addProductToOrder(orderDetail: OrderDetail): Promise<void> {
     await this.ensureDatabaseInitialized();
@@ -454,6 +679,16 @@ export class DatabaseService {
       throw error;
     }
   }
-  
+
+  async testDatabaseConnection(): Promise<boolean> {
+    await this.ensureDatabaseInitialized();
+    try {
+      const result = await this.db!.query('SELECT 1');
+      return (result.values!).length > 0;
+    } catch (error) {
+      console.error('Database connection test failed:', error);
+      return false;
+    }
+  }
 }
 
