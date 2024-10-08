@@ -53,12 +53,12 @@ export class AppComponent {
     await this.platform.ready();
     console.log('Platform ready');
     console.log('Is native platform:', Capacitor.isNativePlatform());
-
+  
     try {
       console.log('Initializing database...');
-      await this.databaseService.createDatabase();
+      await this.databaseService.initializeDatabase();
       console.log('Database initialized successfully');
-
+  
       // Esperar a que la base de datos esté lista
       this.databaseService.dbState().subscribe(async (isReady) => {
         if (isReady) {
@@ -66,7 +66,7 @@ export class AppComponent {
           await this.checkAndInsertSeedData();
         }
       });
-
+  
     } catch (error) {
       console.error('Error initializing app:', error);
       await this.presentAlert('Error', 'Failed to initialize the app. Please try again.');

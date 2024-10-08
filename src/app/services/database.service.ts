@@ -10,13 +10,41 @@ import { Product } from '../models/product.model';
 import { Order } from '../models/order.model';
 import { OrderDetail } from '../models/order-detail.model';
 
+
 @Injectable({
   providedIn: 'root'
 })
 export class DatabaseService {
-  public database!: SQLiteObject;
+  private database!: SQLiteObject;
+  private dbReady: BehaviorSubject<boolean> = new BehaviorSubject(false);
 
-  
+  constructor(
+    private platform: Platform, 
+    private sqlite: SQLite,
+    private alertController: AlertController
+  ) {
+    this.platform.ready().then(() => {
+      this.initializeDatabase();
+    });
+  }
+
+  async initializeDatabase() {
+    try {
+      this.database = await this.sqlite.create({
+        name: 'cafeteria.db',
+        location: 'default'
+      });
+      await this.createTables();
+      await this.insertSeedData();
+      this.dbReady.next(true);
+    } catch (error) {
+      console.error('Error initializing database', error);
+      this.presentAlert('Error', 'Failed to initialize the database. Please try again.');
+    }
+  }
+
+
+
 
   // Tablas
   tableUsers: string = `
@@ -102,14 +130,7 @@ export class DatabaseService {
 
   // Observable para el estado de la base de datos
   private isDBReady: BehaviorSubject<boolean> = new BehaviorSubject(false);
-
-  constructor(
-    private sqlite: SQLite,
-    private platform: Platform,
-    private alertController: AlertController
-  ) {
-    this.createDatabase();
-  }
+  
 
   async presentAlert(titulo: string, msj: string) {
     const alert = await this.alertController.create({
@@ -137,21 +158,6 @@ export class DatabaseService {
     return this.orders.asObservable();
   }
 
-  // Crear base de datos
-  createDatabase() {
-    this.platform.ready().then(() => {
-      this.sqlite.create({
-        name: 'cafeteria.db',
-        location: 'default'
-      }).then((db: SQLiteObject) => {
-        this.database = db;
-        this.createTables();
-      }).catch(e => {
-        this.presentAlert('Base de Datos', 'Error al crear la BD: ' + JSON.stringify(e));
-      });
-    });
-  }
-
   async createTables() {
     try {
       await this.database.executeSql(this.tableUsers, []);
@@ -159,11 +165,11 @@ export class DatabaseService {
       await this.database.executeSql(this.tableOrders, []);
       await this.database.executeSql(this.tableOrderDetails, []);
       await this.database.executeSql(this.tableSalesReports, []);
-
+  
       // Insertar datos de ejemplo
       await this.database.executeSql(this.sampleAdminUser, []);
       await this.database.executeSql(this.sampleProduct, []);
-
+  
       this.loadInitialData();
       this.isDBReady.next(true);
     } catch (e) {
