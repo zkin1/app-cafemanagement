@@ -123,17 +123,17 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
     await loading.present();
 
     const newUser: User = {
-      name: data.name,
-      email: data.email,
-      password: data.password,
-      role: data.role,
-      username: data.email
+      Name: data.name,
+      Email: data.email,
+      Password: data.password,
+      Role: data.role,
+      Username: data.email
     };
 
     try {
       const userId = await this.createUser(newUser);
       if (userId !== undefined) {
-        newUser.id = userId;
+        newUser.UserID = userId;
         this.users.push(newUser);
         this.presentToast('Empleado añadido con éxito');
       } else {
@@ -173,7 +173,7 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
     try {
       const success = await this.updateUser(this.editingUser);
       if (success) {
-        const index = this.users.findIndex(u => u.id === this.editingUser!.id);
+        const index = this.users.findIndex(u => u.UserID === this.editingUser!.UserID);
         if (index !== -1) {
           this.users[index] = { ...this.editingUser };
         }
@@ -210,7 +210,7 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
   async deleteUser(user: User) {
     const alert = await this.alertController.create({
       header: 'Confirmar eliminación',
-      message: `¿Está seguro de que desea eliminar a ${user.name}?`,
+      message: `¿Está seguro de que desea eliminar a ${user.Name}?`,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {
@@ -232,9 +232,9 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
     await loading.present();
 
     try {
-      const success = await this.deleteUserFromDb(user.id!);
+      const success = await this.deleteUserFromDb(user.UserID!);
       if (success) {
-        this.users = this.users.filter(u => u.id !== user.id);
+        this.users = this.users.filter(u => u.UserID !== user.UserID);
         this.presentToast('Empleado eliminado con éxito');
       } else {
         throw new Error('No se pudo eliminar el usuario');

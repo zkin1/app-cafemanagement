@@ -56,11 +56,11 @@ export class RegisterPage implements OnDestroy {
       }
 
       const newUser: User = {
-        name: this.name,
-        email: this.email,
-        password: this.password,
-        role: 'employee', // Default role, can be changed by admin later
-        username: this.email, // Using email as username for simplicity
+        Name: this.name,
+        Email: this.email,
+        Password: this.password,
+        Role: 'employee', // Default role, can be changed by admin later
+        Username: this.email, // Using email as username for simplicity
       };
 
       const userId = await this.createUser(newUser);

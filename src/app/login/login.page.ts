@@ -31,7 +31,7 @@ export class LoginPage {
   
     try {
       const user = await this.databaseService.authenticateUser(this.email, this.password);
-      console.log('Authentication response:', user); // Log para depuración
+      console.log('Authentication response:', user);
       if (user) {
         await this.handleSuccessfulLogin(user);
       } else {
@@ -44,18 +44,25 @@ export class LoginPage {
   }
 
   private async handleSuccessfulLogin(user: User) {
-    // Remove sensitive information before storing
-    const { password, ...safeUserInfo } = user;
+    console.log('Usuario autenticado:', JSON.stringify(user));
+    const safeUserInfo = {
+      id: user.UserID,
+      username: user.Username,
+      name: user.Name,
+      email: user.Email,
+      role: user.Role
+    };
+    console.log('Información de usuario a guardar:', JSON.stringify(safeUserInfo));
     localStorage.setItem('currentUser', JSON.stringify(safeUserInfo));
     
-    await this.databaseService.updateUserLastLogin(user.id!);
+    if (user.UserID !== undefined) {
+      await this.databaseService.updateUserLastLogin(user.UserID);
+    }
     
-    await this.presentToast(`Bienvenido, ${user.name}!`);
+    await this.presentToast(`Bienvenido, ${user.Name}!`);
     
-    // Navegar a la página principal
     this.router.navigate(['/main']);
   }
-
   async presentToast(message: string) {
     const toast = await this.toastController.create({
       message: message,

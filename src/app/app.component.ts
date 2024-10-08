@@ -100,23 +100,30 @@ export class AppComponent {
     }
   }
 
+
   get isLoggedIn(): boolean {
     return !!localStorage.getItem('currentUser');
   }
 
-  get isAdmin(): boolean {
-    const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    return user.role === 'admin';
-  }
+get isAdmin(): boolean {
+  const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+  return user.role === 'admin';
+}
 
   get isEmployee(): boolean {
     const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
     return user.role === 'employee';
   }
 
-  get currentUserName(): string | undefined {
-    const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    return user.name;
+  get currentUserName(): string {
+    const userString = localStorage.getItem('currentUser');
+    console.log('Usuario almacenado:', userString);
+    if (userString) {
+      const user = JSON.parse(userString);
+      console.log('Usuario parseado:', JSON.stringify(user));
+      return user.name || 'Usuario';
+    }
+    return 'Usuario';
   }
 
   logout() {

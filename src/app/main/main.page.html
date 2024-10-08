@@ -1,14 +1,14 @@
 <ion-header>
-
   <ion-toolbar>
     <ion-buttons slot="start">
       <ion-menu-button></ion-menu-button>
     </ion-buttons>
-    <ion-title>Menú - Orden #{{ currentOrderNumber }}</ion-title>
+    <ion-title>Menú - Orden #{{ currentOrderNumber || 'Nueva' }}</ion-title>
     <ion-buttons slot="end">
       <ion-button routerLink="/carro-compras">
-        <ion-icon name="cart-outline"></ion-icon>
-        <ion-badge *ngIf="currentOrderItems.length > 0">{{ currentOrderItems.length }}</ion-badge>
+        <ion-icon name="cart-outline" aria-hidden="true"></ion-icon>
+        <ion-badge *ngIf="currentOrderItems && currentOrderItems.length > 0">{{ currentOrderItems.length }}</ion-badge>
+        <span class="sr-only">Carrito de compras</span>
       </ion-button>
     </ion-buttons>
   </ion-toolbar>
@@ -17,35 +17,42 @@
 <ion-content>
   <div class="menu-container">
     <ion-grid>
-      <ion-row>
+      <ion-row *ngIf="products && products.length > 0; else noProducts">
         <ion-col size="12" size-md="6" size-lg="4" *ngFor="let product of products; let i = index">
           <ion-card class="product-card">
-            <img [src]="product.imageURL" [alt]="product.name"/>
+            <img [src]="product.imageURL" [alt]="product.name || 'Imagen del producto'" (error)="handleImageError($event)"/>
             <ion-card-header>
-              <ion-card-title>{{ product.name }}</ion-card-title>
+              <ion-card-title>{{ product.name || 'Producto sin nombre' }}</ion-card-title>
             </ion-card-header>
             <ion-card-content>
-              <p>{{ product.description }}</p>
+              <p>{{ product.description || 'Sin descripción disponible' }}</p>
               <ion-text color="primary">
                 <h2>{{ calculatePrice(product) | currency:'CLP':'symbol-narrow':'1.0-0' }}</h2>
               </ion-text>
-              <ion-button expand="block" (click)="toggleOptions(i)">Personalizar y Añadir</ion-button>
+              <ion-button expand="block" (click)="toggleOptions(i)">
+                {{ product.showOptions ? 'Ocultar opciones' : 'Personalizar y Añadir' }}
+              </ion-button>
             </ion-card-content>
           </ion-card>
           
           <ion-card *ngIf="product.showOptions" class="options-card" [@slideInOut]>
             <ion-card-content>
               <ion-item>
-                <ion-label>Tamaño</ion-label>
-                <ion-select [(ngModel)]="product.selectedSize" (ionChange)="updatePrice(product)" interface="popover">
+                <ion-label position="stacked">Tamaño</ion-label>
+                <ion-select [(ngModel)]="product.selectedSize" 
+                            (ionChange)="updatePrice(product)" 
+                            interface="popover"
+                            placeholder="Seleccione un tamaño">
                   <ion-select-option value="pequeño">Pequeño (-$1.000)</ion-select-option>
                   <ion-select-option value="medium">Mediano</ion-select-option>
                   <ion-select-option value="grande">Grande (+$1.000)</ion-select-option>
                 </ion-select>
               </ion-item>
               <ion-item>
-                <ion-label>Tipo de leche</ion-label>
-                <ion-select [(ngModel)]="product.selectedMilk" interface="popover">
+                <ion-label position="stacked">Tipo de leche</ion-label>
+                <ion-select [(ngModel)]="product.selectedMilk" 
+                            interface="popover"
+                            placeholder="Seleccione un tipo de leche">
                   <ion-select-option value="regular">Regular</ion-select-option>
                   <ion-select-option value="descremada">Descremada</ion-select-option>
                   <ion-select-option value="soya">Soya</ion-select-option>
@@ -57,22 +64,36 @@
           </ion-card>
         </ion-col>
       </ion-row>
+      <ng-template #noProducts>
+        <ion-col>
+          <ion-card>
+            <ion-card-header>
+              <ion-card-title>No hay productos disponibles</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+              <p>Lo sentimos, no hay productos disponibles en este momento. Por favor, intente más tarde.</p>
+            </ion-card-content>
+          </ion-card>
+        </ion-col>
+      </ng-template>
     </ion-grid>
   </div>
 </ion-content>
 
 <ion-footer>
   <ion-toolbar>
-    <ion-button expand="block" routerLink="/carro-compras" [disabled]="currentOrderItems.length === 0">
-      Completar Orden ({{ currentOrderItems.length }} items)
+    <ion-button expand="block" 
+                routerLink="/carro-compras" 
+                [disabled]="!currentOrderItems || currentOrderItems.length === 0">
+      Completar Orden ({{ currentOrderItems?.length || 0 }} items)
     </ion-button>
   </ion-toolbar>
 </ion-footer>
 
 <ion-toast
-[isOpen]="showToast"
-[message]="toastMessage"
-[duration]="3000"
-position="top"
-color="primary"
-></ion-toast>
+  [isOpen]="showToast"
+  [message]="toastMessage"
+  [duration]="3000"
+  position="top"
+  color="primary">
+</ion-toast>

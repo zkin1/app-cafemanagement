@@ -46,15 +46,21 @@ export class PerfilPage implements OnInit, OnDestroy {
       message: 'Cargando perfil...',
     });
     await loading.present();
-
+  
     try {
       const userId = this.obtenerIdUsuarioActual();
       if (!userId) {
         throw new Error('No se encontró un usuario activo');
       }
-
+  
       this.usuario = await this.getUserById(userId);
-      this.esAdmin = this.usuario.role === 'admin';
+      this.esAdmin = this.usuario.Role === 'admin';
+      
+      // Actualiza la información en el localStorage
+      localStorage.setItem('currentUser', JSON.stringify(this.usuario));
+      
+      console.log('Usuario cargado:', this.usuario);
+      console.log('Es admin:', this.esAdmin);
     } catch (error) {
       console.error('Error al cargar el perfil del usuario:', error);
       await this.presentToast('Error al cargar el perfil. Por favor, intente de nuevo.');
@@ -147,7 +153,7 @@ export class PerfilPage implements OnInit, OnDestroy {
     await loading.present();
 
     try {
-      const success = await this.updateUserPassword(this.usuario.id!, this.datosContrasena.contrasenaActual, this.datosContrasena.nuevaContrasena);
+      const success = await this.updateUserPassword(this.usuario.UserID!, this.datosContrasena.contrasenaActual, this.datosContrasena.nuevaContrasena);
       if (success) {
         await this.presentToast('Contraseña cambiada con éxito');
         this.datosContrasena = { contrasenaActual: '', nuevaContrasena: '', confirmarContrasena: '' };
@@ -209,5 +215,8 @@ export class PerfilPage implements OnInit, OnDestroy {
     });
 
     await alert.present();
+  }
+
+  ionViewWillLeave() {
   }
 }

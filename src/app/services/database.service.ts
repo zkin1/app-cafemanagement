@@ -3,9 +3,9 @@ import { SQLite, SQLiteObject } from '@awesome-cordova-plugins/sqlite/ngx';
 import { AlertController, Platform } from '@ionic/angular';
 import { BehaviorSubject, Observable, from } from 'rxjs';
 import { map } from 'rxjs/operators';
-import {catchError } from 'rxjs/operators';
+import {catchError, switchMap } from 'rxjs/operators';
 import { User } from '../models/user.model';
-import { of } from 'rxjs';
+import { of, firstValueFrom, forkJoin } from 'rxjs';
 import { Product } from '../models/product.model';
 import { Order } from '../models/order.model';
 import { OrderDetail } from '../models/order-detail.model';
@@ -35,7 +35,7 @@ export class DatabaseService {
         location: 'default'
       });
       await this.createTables();
-      await this.insertSeedData();
+      await firstValueFrom(this.insertSeedData());
       this.dbReady.next(true);
     } catch (error) {
       console.error('Error initializing database', error);
@@ -114,15 +114,6 @@ export class DatabaseService {
       FOREIGN KEY (TopSellingProduct) REFERENCES Products(ProductID)
     );`;
 
-  // Datos de ejemplo
-  sampleAdminUser: string = `
-    INSERT OR IGNORE INTO Users (UserID, Username, Password, Role, Name, Email)
-    VALUES (1, 'admin', 'admin123', 'admin', 'Administrador', 'admin@cafeteria.com');`;
-
-  sampleProduct: string = `
-    INSERT OR IGNORE INTO Products (ProductID, Name, Description, Price, Category, ImageURL, IsAvailable)
-    VALUES (1, 'Café Americano', 'Café negro tradicional', 2500, 'Bebidas calientes', 'assets/americano.jpg', 1);`;
-
   // BehaviorSubjects para los listados
   private users = new BehaviorSubject<User[]>([]);
   private products = new BehaviorSubject<Product[]>([]);
@@ -166,9 +157,8 @@ export class DatabaseService {
       await this.database.executeSql(this.tableOrderDetails, []);
       await this.database.executeSql(this.tableSalesReports, []);
   
-      // Insertar datos de ejemplo
-      await this.database.executeSql(this.sampleAdminUser, []);
-      await this.database.executeSql(this.sampleProduct, []);
+      // Insertar datos de ejemplo usando insertSeedData
+      await this.insertSeedData().toPromise();
   
       this.loadInitialData();
       this.isDBReady.next(true);
@@ -179,32 +169,40 @@ export class DatabaseService {
 
   // Cargar datos iniciales
   loadInitialData() {
-    this.getAllUsers();
-    this.getAllProducts();
-    this.getOrdersByStatus(['Solicitado', 'En proceso', 'Listo']);
+    forkJoin([
+      this.getAllUsers(),
+      this.getAllProducts(),
+      this.getOrdersByStatus(['Solicitado', 'En proceso', 'Listo'])
+    ]).subscribe({
+      next: ([users, products, orders]) => {
+        this.users.next(users);
+        this.products.next(products);
+        this.orders.next(orders);
+        console.log('Initial data loaded successfully');
+      },
+      error: error => console.error('Error loading initial data:', error)
+    });
   }
 
   // Métodos CRUD para Users
   async createUser(user: User): Promise<number> {
-    const data = [user.username, user.password, user.role, user.name, user.email, user.phoneNumber, user.hireDate?.toISOString()];
+    const data = [user.Username, user.Password, user.Role, user.Name, user.Email, user.PhoneNumber, user.HireDate?.toISOString()];
     const result = await this.database.executeSql('INSERT INTO Users (Username, Password, Role, Name, Email, PhoneNumber, HireDate) VALUES (?, ?, ?, ?, ?, ?, ?)', data);
     this.getAllUsers();
     return result.insertId;
   }
 
-  async getAllUsers(): Promise<User[]> {
-    const data = await this.database.executeSql('SELECT * FROM Users', []);
-    let users: User[] = [];
-  
-    if (data.rows.length > 0) {
-      for (let i = 0; i < data.rows.length; i++) {
-        users.push(data.rows.item(i));
-      }
-    }
-  
-    return users;
+  getAllUsers(): Observable<User[]> {
+    return from(this.database.executeSql('SELECT * FROM Users', [])).pipe(
+      map(data => {
+        let users: User[] = [];
+        for (let i = 0; i < data.rows.length; i++) {
+          users.push(data.rows.item(i));
+        }
+        return users;
+      })
+    );
   }
-  
 
   // Métodos CRUD para Products
   async createProduct(product: Product): Promise<number> {
@@ -215,18 +213,33 @@ export class DatabaseService {
   }
 
   getAllProducts(): Observable<Product[]> {
-    return from(this.database.executeSql('SELECT * FROM Products', []))
-      .pipe(
-        map(data => {
-          let products: Product[] = [];
-          if (data.rows.length > 0) {
-            for (let i = 0; i < data.rows.length; i++) {
-              products.push(data.rows.item(i));
-            }
-          }
-          return products;
-        })
-      );
+    console.log('Obteniendo todos los productos...');
+    return from(this.database.executeSql('SELECT * FROM Products', [])).pipe(
+      map(data => {
+        console.log('Resultado de la consulta de productos:', JSON.stringify(data));
+        let products: Product[] = [];
+        for (let i = 0; i < data.rows.length; i++) {
+          let item = data.rows.item(i);
+          console.log('Producto individual:', JSON.stringify(item));
+          products.push({
+            id: item.ProductID,
+            name: item.Name,
+            description: item.Description,
+            price: item.Price,
+            category: item.Category,
+            imageURL: item.ImageURL,
+            isAvailable: item.IsAvailable === 1
+          });
+        }
+        console.log('Productos procesados:', JSON.stringify(products));
+        this.products.next(products);
+        return products;
+      }),
+      catchError(error => {
+        console.error('Error al obtener productos:', error);
+        return of([]);
+      })
+    );
   }
 
   // Métodos para Orders
@@ -237,28 +250,46 @@ export class DatabaseService {
     return result.insertId;
   }
 
-  async getOrdersByStatus(statuses: string[]): Promise<Order[]> {
+  getOrdersByStatus(statuses: string[]): Observable<Order[]> {
     const placeholders = statuses.map(() => '?').join(',');
-    const data = await this.database.executeSql(`SELECT * FROM Orders WHERE Status IN (${placeholders})`, statuses);
-    let orders: Order[] = [];
-    
-    if (data.rows.length > 0) {
-      for (let i = 0; i < data.rows.length; i++) {
-        orders.push(data.rows.item(i));
-      }
-    }
-  
-    this.orders.next(orders); 
-  
-    return orders;
+    return from(this.database.executeSql(`SELECT * FROM Orders WHERE Status IN (${placeholders})`, statuses)).pipe(
+      map(data => {
+        let orders: Order[] = [];
+        for (let i = 0; i < data.rows.length; i++) {
+          orders.push({
+            ...data.rows.item(i),
+            status: data.rows.item(i).Status 
+          });
+        }
+        return orders;
+      })
+    );
   }
 
   // Método de autenticación
   async authenticateUser(email: string, password: string): Promise<User | null> {
-    const data = await this.database.executeSql('SELECT * FROM Users WHERE Email = ? AND Password = ?', [email, password]);
+    console.log('Intentando autenticar usuario:', email);
+    const data = await this.database.executeSql(
+      'SELECT * FROM Users WHERE Email = ? AND Password = ?', 
+      [email, password]
+    );
+    console.log('Resultado de la consulta:', data);
     if (data.rows.length > 0) {
-      return data.rows.item(0);
+      const user: User = {
+        UserID: data.rows.item(0).UserID,
+        Username: data.rows.item(0).Username,
+        Password: data.rows.item(0).Password,
+        Role: data.rows.item(0).Role,
+        Name: data.rows.item(0).Name,
+        Email: data.rows.item(0).Email,
+        PhoneNumber: data.rows.item(0).PhoneNumber,
+        HireDate: data.rows.item(0).HireDate ? new Date(data.rows.item(0).HireDate) : undefined,
+        LastLogin: data.rows.item(0).LastLogin ? new Date(data.rows.item(0).LastLogin) : undefined
+      };
+      console.log('Usuario autenticado:', JSON.stringify(user));
+      return user;
     }
+    console.log('No se encontró usuario');
     return null;
   }
 
@@ -369,7 +400,7 @@ export class DatabaseService {
   }
   public updateUserFromDb(user: User): Promise<boolean> {
     const sql = 'UPDATE Users SET Username = ?, Name = ?, Email = ?, Role = ? WHERE UserID = ?';
-    const data = [user.username, user.name, user.email, user.role, user.id];
+    const data = [user.Username, user.Name, user.Email, user.Role, user.UserID];
   
     // Realiza la consulta SQL directamente usando `executeSql`
     const result = new Observable<boolean>(observer => {
@@ -465,39 +496,69 @@ export class DatabaseService {
   }
 
   // Método para insertar datos de prueba
+
+
   insertSeedData(): Observable<boolean> {
-    return new Observable(observer => {
-      const users = [
-        { username: 'admin', password: 'admin123', role: 'admin', name: 'Admin User', email: 'admin@example.com' },
-        { username: 'employee1', password: 'emp123', role: 'employee', name: 'Employee One', email: 'emp1@example.com' }
-      ];
-
-      const products = [
-        { name: 'Café Americano', description: 'Café negro tradicional', price: 2500, category: 'Bebidas calientes', imageURL: 'assets/americano.jpg', isAvailable: true },
-        { name: 'Cappuccino', description: 'Espresso con leche espumosa', price: 3000, category: 'Bebidas calientes', imageURL: 'assets/cappuccino.jpg', isAvailable: true }
-      ];
-
-      // Insertar usuarios
-      const userPromises = users.map(user => 
-        this.database.executeSql('INSERT OR IGNORE INTO Users (Username, Password, Role, Name, Email) VALUES (?, ?, ?, ?, ?)', 
-          [user.username, user.password, user.role, user.name, user.email])
-      );
-
-      // Insertar productos
-      const productPromises = products.map(product => 
-        this.database.executeSql('INSERT OR IGNORE INTO Products (Name, Description, Price, Category, ImageURL, IsAvailable) VALUES (?, ?, ?, ?, ?, ?)', 
-          [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0])
-      );
-
-      Promise.all([...userPromises, ...productPromises])
-        .then(() => {
-          observer.next(true);
-          observer.complete();
-        })
-        .catch(e => observer.error(e));
-    });
-  }
-
+    const users = [
+      { username: 'admin', password: 'admin123', role: 'admin', name: 'Admin User', email: 'admin@example.com' },
+      { username: 'employee1', password: 'emp123', role: 'employee', name: 'Employee One', email: 'emp1@example.com' }
+    ];
   
+    const products = [
+      { name: 'Café Americano', description: 'Café negro tradicional', price: 2500, category: 'Bebidas calientes', imageURL: 'americano.jpg', isAvailable: true },
+      { name: 'Cappuccino', description: 'Espresso con leche espumosa', price: 3000, category: 'Bebidas calientes', imageURL: 'cappuccino.jpg', isAvailable: true },
+      { name: 'Latte', description: 'Café con leche cremosa', price: 3200, category: 'Bebidas calientes', imageURL: 'latte.jpg', isAvailable: true },
+      { name: 'Mocha', description: 'Café con chocolate y leche', price: 3500, category: 'Bebidas calientes', imageURL: 'mocha.jpg', isAvailable: true },
+      { name: 'Espresso', description: 'Café concentrado', price: 2000, category: 'Bebidas calientes', imageURL: 'espresso.jpg', isAvailable: true }
+    ];
+  
+    return forkJoin([
+      from(this.database.executeSql('SELECT COUNT(*) as count FROM Users', [])),
+      from(this.database.executeSql('SELECT COUNT(*) as count FROM Products', []))
+    ]).pipe(
+      map(([userResult, productResult]) => {
+        const userCount = userResult.rows.item(0).count;
+        const productCount = productResult.rows.item(0).count;
+        return userCount === 0 || productCount === 0;
+      }),
+      switchMap(shouldInsert => {
+        if (shouldInsert) {
+          console.log('Insertando datos de ejemplo...');
+          const userInserts = users.map(user => 
+            this.database.executeSql(
+              'INSERT OR IGNORE INTO Users (Username, Password, Role, Name, Email) VALUES (?, ?, ?, ?, ?)', 
+              [user.username, user.password, user.role, user.name, user.email]
+            )
+          );
+  
+          const productInserts = products.map(product => 
+            this.database.executeSql(
+              'INSERT OR IGNORE INTO Products (Name, Description, Price, Category, ImageURL, IsAvailable) VALUES (?, ?, ?, ?, ?, ?)', 
+              [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0]
+            )
+          );
+  
+          return forkJoin([...userInserts, ...productInserts]);
+        }
+        return of(null);
+      }),
+      map(result => {
+        if (result) {
+          console.log('Seed data inserted successfully');
+          // Verificar los datos insertados
+          this.getAllUsers().subscribe(users => console.log('Users after seed:', users));
+          this.getAllProducts().subscribe(products => console.log('Products after seed:', products));
+          return true;
+        } else {
+          console.log('Seed data already exists');
+          return false;
+        }
+      }),
+      catchError(error => {
+        console.error('Error in insertSeedData:', error);
+        return of(false);
+      })
+    );
+  }
   
 }

@@ -11,9 +11,9 @@
   <ion-list>
     <ion-item *ngFor="let user of users">
       <ion-label>
-        <h2>{{ user.name }}</h2>
-        <p>{{ user.email }}</p>
-        <p>Rol: {{ user.role }}</p>
+        <h2>{{ user.Name }}</h2>
+        <p>{{ user.Email }}</p>
+        <p>Rol: {{ user.Role }}</p>
       </ion-label>
       <ion-button slot="end" (click)="editUser(user)">Editar</ion-button>
     </ion-item>
@@ -32,15 +32,15 @@
       <ion-content class="ion-padding">
         <ion-item *ngIf="editingUser">
           <ion-label position="floating">Nombre</ion-label>
-          <ion-input [(ngModel)]="editingUser.name"></ion-input>
+          <ion-input [(ngModel)]="editingUser.Name"></ion-input>
         </ion-item>
         <ion-item *ngIf="editingUser">
           <ion-label position="floating">Email</ion-label>
-          <ion-input [(ngModel)]="editingUser.email" type="email"></ion-input>
+          <ion-input [(ngModel)]="editingUser.Email" type="Email"></ion-input>
         </ion-item>
         <ion-item *ngIf="editingUser">
           <ion-label>Rol</ion-label>
-          <ion-select [(ngModel)]="editingUser.role">
+          <ion-select [(ngModel)]="editingUser.Role">
             <ion-select-option value="admin">Admin</ion-select-option>
             <ion-select-option value="empleado">Empleado</ion-select-option>
           </ion-select>

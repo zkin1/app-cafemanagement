@@ -47,26 +47,45 @@ export class MainPage implements OnInit {
     await this.loadProducts();
   }
 
-  loadProducts() {
-    this.loadingController.create({
+  async loadProducts() {
+    const loading = await this.loadingController.create({
       message: 'Cargando productos...',
-    }).then(loading => {
-      loading.present();
+    });
+    await loading.present();
   
+    try {
+      const products = await this.getAllProducts();
+      console.log('Productos obtenidos de la base de datos:', products);
+  
+      this.products = products.map(product => ({
+        ...product,
+        imageURL: product.imageURL ? `assets/${product.imageURL}` : 'assets/default-product-image.jpg',
+        showOptions: false,
+        selectedSize: 'medium',
+        selectedMilk: 'regular'
+      }));
+  
+      console.log('Productos procesados con URLs de imagen actualizadas:', this.products);
+    } catch (error) {
+      console.error('Error al cargar los productos:', error);
+      this.presentToast('Error al cargar los productos. Por favor, intente de nuevo.');
+    } finally {
+      await loading.dismiss();
+    }
+  }
+
+
+  private getAllProducts(): Promise<Product[]> {
+    return new Promise((resolve, reject) => {
       this.databaseService.getAllProducts().subscribe({
-        next: (dbProducts) => {
-          this.products = dbProducts.map(product => ({
-            ...product,
-            showOptions: false,
-            selectedSize: 'medium',
-            selectedMilk: 'regular'
-          }));
+        next: (products) => {
+          console.log('Productos recibidos del servicio:', products);
+          resolve(products);
         },
-        error: (error) => {
-          console.error('Error loading products:', error);
-          this.presentToast('Error al cargar los productos. Por favor, intente de nuevo.');
-        },
-        complete: () => loading.dismiss(),
+        error: (err) => {
+          console.error('Error al obtener productos:', err);
+          reject(err);
+        }
       });
     });
   }
@@ -76,10 +95,13 @@ export class MainPage implements OnInit {
   }
 
   get currentUserName(): string | null {
-    const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    return user.name || null;
+    const userString = localStorage.getItem('currentUser');
+    if (userString) {
+      const user = JSON.parse(userString);
+      return user.name || null;
+    }
+    return null;
   }
-
   toggleOptions(index: number) {
     this.products[index].showOptions = !this.products[index].showOptions;
   }
@@ -180,4 +202,11 @@ export class MainPage implements OnInit {
     );
     return item ? item.quantity : 0;
   }
+
+  handleImageError(event: any) {
+    event.target.src = 'assets/default-product-image.jpg';
+  }
+
 }
+
+

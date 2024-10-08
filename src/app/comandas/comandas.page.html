@@ -44,7 +44,7 @@
       <ion-button [disabled]="orden.status !== 'En proceso'" (click)="cambiarEstado(orden, 'Listo')" color="success">
         Lista
       </ion-button>
-      <ion-button [disabled]="orden.status === 'Cancelado'" (click)="cambiarEstado(orden, 'Cancelado')" color="danger">
+      <ion-button [disabled]="orden.status === 'Listo' || orden.status === 'Cancelado'" (click)="cambiarEstado(orden, 'Cancelado')" color="danger">
         Cancelar
       </ion-button>
     </div>

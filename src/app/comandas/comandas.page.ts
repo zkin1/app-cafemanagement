@@ -96,24 +96,18 @@ export class ComandasPage implements OnInit, OnDestroy {
   }
 
   async cambiarEstado(orden: Order, nuevoEstado: 'En proceso' | 'Listo' | 'Cancelado' | 'Entregado') {
-    const loading = await this.loadingController.create({
-      message: 'Actualizando estado...',
-    });
-    await loading.present();
-
     try {
       await this.updateOrderStatus(orden.id!, nuevoEstado);
       orden.status = nuevoEstado;
       this.presentToast(`Orden #${orden.id} actualizada a ${nuevoEstado}`);
-
+  
+      // Actualiza la lista de órdenes si el estado es Entregado o Cancelado
       if (nuevoEstado === 'Entregado' || nuevoEstado === 'Cancelado') {
-        this.ordenes = this.ordenes.filter(o => o.id !== orden.id);
+        await this.cargarOrdenes(); // Vuelve a cargar todas las órdenes
       }
     } catch (error) {
       console.error('Error al actualizar estado de la orden:', error);
       this.presentToast('Error al actualizar el estado. Por favor, intente de nuevo.');
-    } finally {
-      await loading.dismiss();
     }
   }
 
