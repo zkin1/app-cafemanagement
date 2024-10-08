@@ -1,10 +1,14 @@
 import { Injectable } from '@angular/core';
 import { SQLite, SQLiteObject } from '@awesome-cordova-plugins/sqlite/ngx';
 import { AlertController, Platform } from '@ionic/angular';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, Observable, from } from 'rxjs';
+import { map } from 'rxjs/operators';
+import {catchError } from 'rxjs/operators';
 import { User } from '../models/user.model';
+import { of } from 'rxjs';
 import { Product } from '../models/product.model';
 import { Order } from '../models/order.model';
+import { OrderDetail } from '../models/order-detail.model';
 
 @Injectable({
   providedIn: 'root'
@@ -12,57 +16,99 @@ import { Order } from '../models/order.model';
 export class DatabaseService {
   public database!: SQLiteObject;
 
-  // Definición de tablas
-  tableUser: string = `CREATE TABLE IF NOT EXISTS user(
-    id INTEGER PRIMARY KEY AUTOINCREMENT, 
-    username TEXT NOT NULL UNIQUE, 
-    password TEXT NOT NULL, 
-    role TEXT NOT NULL,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE,
-    phoneNumber TEXT,
-    hireDate TEXT
-  );`;
+  
 
-  tableProduct: string = `CREATE TABLE IF NOT EXISTS product(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    description TEXT,
-    price REAL NOT NULL,
-    category TEXT NOT NULL,
-    imageURL TEXT,
-    isAvailable INTEGER DEFAULT 1
-  );`;
+  // Tablas
+  tableUsers: string = `
+    CREATE TABLE IF NOT EXISTS Users (
+      UserID INTEGER PRIMARY KEY AUTOINCREMENT,
+      Username TEXT NOT NULL UNIQUE,
+      Password TEXT NOT NULL,
+      Role TEXT NOT NULL CHECK (Role IN ('employee', 'admin', 'manager')),
+      Name TEXT NOT NULL,
+      Email TEXT UNIQUE,
+      PhoneNumber TEXT,
+      HireDate DATE,
+      LastLogin DATETIME
+    );`;
 
-  tableOrder: string = `CREATE TABLE IF NOT EXISTS orders(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    userId INTEGER,
-    tableNumber INTEGER,
-    status TEXT NOT NULL,
-    notes TEXT,
-    totalAmount REAL NOT NULL,
-    paymentMethod TEXT,
-    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (userId) REFERENCES user(id)
-  );`;
+  tableProducts: string = `
+    CREATE TABLE IF NOT EXISTS Products (
+      ProductID INTEGER PRIMARY KEY AUTOINCREMENT,
+      Name TEXT NOT NULL,
+      Description TEXT,
+      Price REAL NOT NULL,
+      Category TEXT NOT NULL,
+      ImageURL TEXT,
+      IsAvailable BOOLEAN DEFAULT 1,
+      CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`;
 
-  // Inserts por defecto
-  defaultAdmin: string = `INSERT OR IGNORE INTO user(id, username, password, role, name, email) 
+  tableOrders: string = `
+    CREATE TABLE IF NOT EXISTS Orders (
+      OrderID INTEGER PRIMARY KEY AUTOINCREMENT,
+      UserID INTEGER,
+      TableNumber INTEGER,
+      Status TEXT NOT NULL CHECK (Status IN ('Solicitado', 'En proceso', 'Listo', 'Cancelado', 'Entregado')),
+      CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      Notes TEXT,
+      TotalAmount REAL NOT NULL,
+      PaymentMethod TEXT,
+      FOREIGN KEY (UserID) REFERENCES Users(UserID)
+    );`;
+
+  tableOrderDetails: string = `
+    CREATE TABLE IF NOT EXISTS OrderDetails (
+      OrderDetailID INTEGER PRIMARY KEY AUTOINCREMENT,
+      OrderID INTEGER,
+      ProductID INTEGER,
+      Quantity INTEGER NOT NULL,
+      Size TEXT,
+      MilkType TEXT,
+      Price REAL NOT NULL,
+      FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
+      FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
+    );`;
+
+  tableSalesReports: string = `
+    CREATE TABLE IF NOT EXISTS SalesReports (
+      ReportID INTEGER PRIMARY KEY AUTOINCREMENT,
+      Date DATE NOT NULL,
+      TotalSales REAL NOT NULL,
+      TotalOrders INTEGER NOT NULL,
+      AverageOrderValue REAL,
+      TopSellingProduct INTEGER,
+      GeneratedBy INTEGER,
+      CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (GeneratedBy) REFERENCES Users(UserID),
+      FOREIGN KEY (TopSellingProduct) REFERENCES Products(ProductID)
+    );`;
+
+  // Datos de ejemplo
+  sampleAdminUser: string = `
+    INSERT OR IGNORE INTO Users (UserID, Username, Password, Role, Name, Email)
     VALUES (1, 'admin', 'admin123', 'admin', 'Administrador', 'admin@cafeteria.com');`;
 
-  // BehaviorSubjects para los listados
-  listUsers = new BehaviorSubject<User[]>([]);
-  listProducts = new BehaviorSubject<Product[]>([]);
-  listOrders = new BehaviorSubject<Order[]>([]);
+  sampleProduct: string = `
+    INSERT OR IGNORE INTO Products (ProductID, Name, Description, Price, Category, ImageURL, IsAvailable)
+    VALUES (1, 'Café Americano', 'Café negro tradicional', 2500, 'Bebidas calientes', 'assets/americano.jpg', 1);`;
 
+  // BehaviorSubjects para los listados
+  private users = new BehaviorSubject<User[]>([]);
+  private products = new BehaviorSubject<Product[]>([]);
+  private orders = new BehaviorSubject<Order[]>([]);
+
+  // Observable para el estado de la base de datos
   private isDBReady: BehaviorSubject<boolean> = new BehaviorSubject(false);
 
   constructor(
-    private sqlite: SQLite, 
-    private platform: Platform, 
+    private sqlite: SQLite,
+    private platform: Platform,
     private alertController: AlertController
   ) {
-    this.createDB();
+    this.createDatabase();
   }
 
   async presentAlert(titulo: string, msj: string) {
@@ -74,25 +120,25 @@ export class DatabaseService {
     await alert.present();
   }
 
-  // Métodos para observables
-  fetchUsers(): Observable<User[]> {
-    return this.listUsers.asObservable();
-  }
-
-  fetchProducts(): Observable<Product[]> {
-    return this.listProducts.asObservable();
-  }
-
-  fetchOrders(): Observable<Order[]> {
-    return this.listOrders.asObservable();
-  }
-
+  // Observables
   dbState() {
     return this.isDBReady.asObservable();
   }
 
-  // Crear la Base de Datos
-  createDB() {
+  fetchUsers(): Observable<User[]> {
+    return this.users.asObservable();
+  }
+
+  fetchProducts(): Observable<Product[]> {
+    return this.products.asObservable();
+  }
+
+  fetchOrders(): Observable<Order[]> {
+    return this.orders.asObservable();
+  }
+
+  // Crear base de datos
+  createDatabase() {
     this.platform.ready().then(() => {
       this.sqlite.create({
         name: 'cafeteria.db',
@@ -108,10 +154,16 @@ export class DatabaseService {
 
   async createTables() {
     try {
-      await this.database.executeSql(this.tableUser, []);
-      await this.database.executeSql(this.tableProduct, []);
-      await this.database.executeSql(this.tableOrder, []);
-      await this.database.executeSql(this.defaultAdmin, []);
+      await this.database.executeSql(this.tableUsers, []);
+      await this.database.executeSql(this.tableProducts, []);
+      await this.database.executeSql(this.tableOrders, []);
+      await this.database.executeSql(this.tableOrderDetails, []);
+      await this.database.executeSql(this.tableSalesReports, []);
+
+      // Insertar datos de ejemplo
+      await this.database.executeSql(this.sampleAdminUser, []);
+      await this.database.executeSql(this.sampleProduct, []);
+
       this.loadInitialData();
       this.isDBReady.next(true);
     } catch (e) {
@@ -120,238 +172,326 @@ export class DatabaseService {
   }
 
   // Cargar datos iniciales
-  async loadInitialData() {
+  loadInitialData() {
     this.getAllUsers();
     this.getAllProducts();
-    this.getAllOrders();
+    this.getOrdersByStatus(['Solicitado', 'En proceso', 'Listo']);
   }
 
-  // Métodos CRUD para User
-  async getAllUsers() {
-    try {
-      const users: User[] = [];
-      const data = await this.database.executeSql('SELECT * FROM user', []);
+  // Métodos CRUD para Users
+  async createUser(user: User): Promise<number> {
+    const data = [user.username, user.password, user.role, user.name, user.email, user.phoneNumber, user.hireDate?.toISOString()];
+    const result = await this.database.executeSql('INSERT INTO Users (Username, Password, Role, Name, Email, PhoneNumber, HireDate) VALUES (?, ?, ?, ?, ?, ?, ?)', data);
+    this.getAllUsers();
+    return result.insertId;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    const data = await this.database.executeSql('SELECT * FROM Users', []);
+    let users: User[] = [];
+  
+    if (data.rows.length > 0) {
       for (let i = 0; i < data.rows.length; i++) {
         users.push(data.rows.item(i));
       }
-      this.listUsers.next(users);
-    } catch (e) {
-      this.presentAlert('Error', 'Error al obtener usuarios: ' + JSON.stringify(e));
     }
+  
+    return users;
+  }
+  
+
+  // Métodos CRUD para Products
+  async createProduct(product: Product): Promise<number> {
+    const data = [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0];
+    const result = await this.database.executeSql('INSERT INTO Products (Name, Description, Price, Category, ImageURL, IsAvailable) VALUES (?, ?, ?, ?, ?, ?)', data);
+    this.getAllProducts();
+    return result.insertId;
   }
 
-  async updateUserLastLogin(userId: number) {
-    try {
-      const data = await this.database.executeSql(
-        'UPDATE Users SET LastLogin = CURRENT_TIMESTAMP WHERE UserID = ?',
-        [userId]
+  getAllProducts(): Observable<Product[]> {
+    return from(this.database.executeSql('SELECT * FROM Products', []))
+      .pipe(
+        map(data => {
+          let products: Product[] = [];
+          if (data.rows.length > 0) {
+            for (let i = 0; i < data.rows.length; i++) {
+              products.push(data.rows.item(i));
+            }
+          }
+          return products;
+        })
       );
-      await this.getAllUsers();
-      this.presentAlert('Éxito', 'Último login del usuario actualizado correctamente');
-    } catch (e) {
-      this.presentAlert('Error', 'Error al actualizar el último login del usuario: ' + JSON.stringify(e));
-    }
   }
 
+  // Métodos para Orders
+  async createOrder(order: Order): Promise<number> {
+    const data = [order.userId, order.tableNumber, order.status, order.notes, order.totalAmount, order.paymentMethod];
+    const result = await this.database.executeSql('INSERT INTO Orders (UserID, TableNumber, Status, Notes, TotalAmount, PaymentMethod) VALUES (?, ?, ?, ?, ?, ?)', data);
+    this.getOrdersByStatus(['Solicitado', 'En proceso', 'Listo']);
+    return result.insertId;
+  }
+
+  async getOrdersByStatus(statuses: string[]): Promise<Order[]> {
+    const placeholders = statuses.map(() => '?').join(',');
+    const data = await this.database.executeSql(`SELECT * FROM Orders WHERE Status IN (${placeholders})`, statuses);
+    let orders: Order[] = [];
+    
+    if (data.rows.length > 0) {
+      for (let i = 0; i < data.rows.length; i++) {
+        orders.push(data.rows.item(i));
+      }
+    }
+  
+    this.orders.next(orders); 
+  
+    return orders;
+  }
+
+  // Método de autenticación
   async authenticateUser(email: string, password: string): Promise<User | null> {
-    try {
-      const result = await this.database.executeSql(
-        'SELECT * FROM Users WHERE Email = ? AND Password = ?',
-        [email, password]
-      );
-      return result.rows.length > 0 ? result.rows.item(0) as User : null;
-    } catch (error) {
-      this.presentAlert('Error', 'Error autenticando al usuario: ' + JSON.stringify(error));
-      throw error;
+    const data = await this.database.executeSql('SELECT * FROM Users WHERE Email = ? AND Password = ?', [email, password]);
+    if (data.rows.length > 0) {
+      return data.rows.item(0);
     }
+    return null;
+  }
+
+  pdateProduct(product: Product): Promise<boolean> | Observable<any> {
+    const data = [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0, product.id];
+    return from(this.database.executeSql('UPDATE Products SET Name = ?, Description = ?, Price = ?, Category = ?, ImageURL = ?, IsAvailable = ? WHERE ProductID = ?', data))
+      .pipe(
+        map(() => {
+          this.getAllProducts();
+          return true;
+        })
+      );
+  }
+
+  // Método para calcular ventas totales
+  async calculateTotalSales(startDate: string, endDate: string): Promise<number> {
+    const data = await this.database.executeSql('SELECT SUM(TotalAmount) as TotalSales FROM Orders WHERE DATE(CreatedAt) BETWEEN ? AND ?', [startDate, endDate]);
+    return data.rows.item(0).TotalSales || 0;
+  }
+
+  // Método para obtener productos más vendidos
+  async getTopSellingProducts(limit: number = 5): Promise<{productId: number, name: string, totalSold: number}[]> {
+    const query = `
+      SELECT 
+        p.ProductID as productId, 
+        p.Name as name, 
+        SUM(od.Quantity) as totalSold
+      FROM OrderDetails od
+      JOIN Products p ON od.ProductID = p.ProductID
+      GROUP BY od.ProductID
+      ORDER BY totalSold DESC
+      LIMIT ?
+    `;
+    const data = await this.database.executeSql(query, [limit]);
+    let topProducts: {productId: number, name: string, totalSold: number}[] = [];
+    if (data.rows.length > 0) {
+      for (let i = 0; i < data.rows.length; i++) {
+        topProducts.push(data.rows.item(i));
+      }
+    }
+    return topProducts;
+  }
+
+  addProductToOrder(orderDetail: OrderDetail): Observable<number> {
+    return new Observable(observer => {
+      const sql = 'INSERT INTO OrderDetails (OrderID, ProductID, Quantity, Size, MilkType, Price) VALUES (?, ?, ?, ?, ?, ?)';
+      const data = [orderDetail.orderId, orderDetail.productId, orderDetail.quantity, orderDetail.size, orderDetail.milkType, orderDetail.price];
+      
+      this.database.executeSql(sql, data)
+        .then(res => {
+          observer.next(res.insertId);
+          observer.complete();
+        })
+        .catch(e => observer.error(e));
+    });
+  }
+
+  getOrderDetails(orderId: number): Observable<OrderDetail[]> {
+    return new Observable(observer => {
+      const sql = 'SELECT * FROM OrderDetails WHERE OrderID = ?';
+      this.database.executeSql(sql, [orderId])
+        .then(data => {
+          let orderDetails: OrderDetail[] = [];
+          for (let i = 0; i < data.rows.length; i++) {
+            orderDetails.push(data.rows.item(i));
+          }
+          observer.next(orderDetails);
+          observer.complete();
+        })
+        .catch(e => observer.error(e));
+    });
+  }
+
+  updateOrderStatus(orderId: number, status: string): Observable<boolean> {
+    return new Observable(observer => {
+      const sql = 'UPDATE Orders SET Status = ? WHERE OrderID = ?';
+      this.database.executeSql(sql, [status, orderId])
+        .then(() => {
+          observer.next(true);
+          observer.complete();
+        })
+        .catch(e => observer.error(e));
+    });
+  }
+
+  updateProduct(product: Product): Observable<boolean> {
+    return new Observable(observer => {
+      const sql = 'UPDATE Products SET Name = ?, Description = ?, Price = ?, Category = ?, ImageURL = ?, IsAvailable = ? WHERE ProductID = ?';
+      const data = [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0, product.id];
+      
+      this.database.executeSql(sql, data)
+        .then(() => {
+          observer.next(true);
+          observer.complete();
+        })
+        .catch(e => observer.error(e));
+    });
+  }
+
+  deleteProduct(id: number): Promise<boolean> | Observable<any> {
+    return from(this.database.executeSql('DELETE FROM Products WHERE ProductID = ?', [id]))
+      .pipe(
+        map(() => {
+          this.getAllProducts();
+          return true;
+        })
+      );
+  }
+  public updateUserFromDb(user: User): Promise<boolean> {
+    const sql = 'UPDATE Users SET Username = ?, Name = ?, Email = ?, Role = ? WHERE UserID = ?';
+    const data = [user.username, user.name, user.email, user.role, user.id];
+  
+    // Realiza la consulta SQL directamente usando `executeSql`
+    const result = new Observable<boolean>(observer => {
+      this.database.executeSql(sql, data)
+        .then(() => {
+          observer.next(true);  // Si la operación es exitosa, emitimos `true`
+          observer.complete();
+        })
+        .catch(error => {
+          observer.error(error); // Si ocurre un error, lo manejamos
+        });
+    });
+  
+    return result.pipe(
+      map(() => true), // Retornamos `true` si la operación fue exitosa
+      catchError(() => of(false)) // En caso de error, retornamos `false`
+    )
+    .toPromise()
+    .then(res => res !== undefined ? res : false); // Aseguramos que nunca se retorne `undefined`
   }
   
+
+  deleteUser(id: number): Observable<boolean> {
+    return new Observable(observer => {
+      const sql = 'DELETE FROM Users WHERE UserID = ?';
+      this.database.executeSql(sql, [id])
+        .then(() => {
+          observer.next(true);
+          observer.complete();
+        })
+        .catch(e => observer.error(e));
+    });
+  }
+
+  updateUserLastLogin(userId: number): Observable<boolean> {
+    return new Observable(observer => {
+      const sql = 'UPDATE Users SET LastLogin = CURRENT_TIMESTAMP WHERE UserID = ?';
+      this.database.executeSql(sql, [userId])
+        .then(() => {
+          observer.next(true);
+          observer.complete();
+        })
+        .catch(e => observer.error(e));
+    });
+  }
+
+  getUserById(id: number): Observable<User> {
+    return new Observable(observer => {
+      const sql = 'SELECT * FROM Users WHERE UserID = ?';
+      this.database.executeSql(sql, [id])
+        .then(data => {
+          if (data.rows.length > 0) {
+            observer.next(data.rows.item(0));
+          } else {
+            observer.error('User not found');
+          }
+          observer.complete();
+        })
+        .catch(e => observer.error(e));
+    });
+  }
+
+  getUserByEmail(email: string): Observable<User | null> {
+    return new Observable(observer => {
+      const sql = 'SELECT * FROM Users WHERE Email = ?';
+      this.database.executeSql(sql, [email])
+        .then(data => {
+          if (data.rows.length > 0) {
+            observer.next(data.rows.item(0));
+          } else {
+            observer.next(null);
+          }
+          observer.complete();
+        })
+        .catch(e => observer.error(e));
+    });
+  }
+
+  updateUserPassword(userId: number, currentPassword: string, newPassword: string): Observable<boolean> {
+    const sql = 'UPDATE Users SET Password = ? WHERE UserID = ? AND Password = ?';
+    const data = [newPassword, userId, currentPassword];
   
+    return new Observable(observer => {
+      this.database.executeSql(sql, data)
+        .then(() => {
+          observer.next(true);  // Si la operación fue exitosa
+          observer.complete();
+        })
+        .catch(error => {
+          observer.error(error);  // Si hay un error, lo emitimos
+        });
+    });
+  }
 
-  async addUser(user: User) {
-    try {
-      const data = await this.database.executeSql(
-        'INSERT INTO user (username, password, role, name, email, phoneNumber, hireDate) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [user.username, user.password, user.role, user.name, user.email, user.phoneNumber, user.hireDate]
+  // Método para insertar datos de prueba
+  insertSeedData(): Observable<boolean> {
+    return new Observable(observer => {
+      const users = [
+        { username: 'admin', password: 'admin123', role: 'admin', name: 'Admin User', email: 'admin@example.com' },
+        { username: 'employee1', password: 'emp123', role: 'employee', name: 'Employee One', email: 'emp1@example.com' }
+      ];
+
+      const products = [
+        { name: 'Café Americano', description: 'Café negro tradicional', price: 2500, category: 'Bebidas calientes', imageURL: 'assets/americano.jpg', isAvailable: true },
+        { name: 'Cappuccino', description: 'Espresso con leche espumosa', price: 3000, category: 'Bebidas calientes', imageURL: 'assets/cappuccino.jpg', isAvailable: true }
+      ];
+
+      // Insertar usuarios
+      const userPromises = users.map(user => 
+        this.database.executeSql('INSERT OR IGNORE INTO Users (Username, Password, Role, Name, Email) VALUES (?, ?, ?, ?, ?)', 
+          [user.username, user.password, user.role, user.name, user.email])
       );
-      this.getAllUsers();
-    } catch (e) {
-      this.presentAlert('Error', 'Error al añadir usuario: ' + JSON.stringify(e));
-    }
-  }
 
-  async updateUser(user: User) {
-    try {
-      const data = await this.database.executeSql(
-        'UPDATE user SET username=?, password=?, role=?, name=?, email=?, phoneNumber=?, hireDate=? WHERE id=?',
-        [user.username, user.password, user.role, user.name, user.email, user.phoneNumber, user.hireDate, user.id]
+      // Insertar productos
+      const productPromises = products.map(product => 
+        this.database.executeSql('INSERT OR IGNORE INTO Products (Name, Description, Price, Category, ImageURL, IsAvailable) VALUES (?, ?, ?, ?, ?, ?)', 
+          [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0])
       );
-      this.getAllUsers();
-    } catch (e) {
-      this.presentAlert('Error', 'Error al actualizar usuario: ' + JSON.stringify(e));
-    }
+
+      Promise.all([...userPromises, ...productPromises])
+        .then(() => {
+          observer.next(true);
+          observer.complete();
+        })
+        .catch(e => observer.error(e));
+    });
   }
 
-  async deleteUser(id: number) {
-    try {
-      const data = await this.database.executeSql('DELETE FROM user WHERE id = ?', [id]);
-      this.getAllUsers();
-    } catch (e) {
-      this.presentAlert('Error', 'Error al eliminar usuario: ' + JSON.stringify(e));
-    }
-  }
-
-  // Métodos CRUD para Product
-  async getAllProducts() {
-    try {
-      const products: Product[] = [];
-      const data = await this.database.executeSql('SELECT * FROM product', []);
-      for (let i = 0; i < data.rows.length; i++) {
-        products.push(data.rows.item(i));
-      }
-      this.listProducts.next(products);
-    } catch (e) {
-      this.presentAlert('Error', 'Error al obtener productos: ' + JSON.stringify(e));
-    }
-  }
-
-  async addProduct(product: Product) {
-    try {
-      const data = await this.database.executeSql(
-        'INSERT INTO product (name, description, price, category, imageURL, isAvailable) VALUES (?, ?, ?, ?, ?, ?)',
-        [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0]
-      );
-      this.getAllProducts();
-    } catch (e) {
-      this.presentAlert('Error', 'Error al añadir producto: ' + JSON.stringify(e));
-    }
-  }
-
-  async updateProduct(product: Product) {
-    try {
-      const data = await this.database.executeSql(
-        'UPDATE product SET name=?, description=?, price=?, category=?, imageURL=?, isAvailable=? WHERE id=?',
-        [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0, product.id]
-      );
-      this.getAllProducts();
-    } catch (e) {
-      this.presentAlert('Error', 'Error al actualizar producto: ' + JSON.stringify(e));
-    }
-  }
-
-  async deleteProduct(id: number) {
-    try {
-      const data = await this.database.executeSql('DELETE FROM product WHERE id = ?', [id]);
-      this.getAllProducts();
-    } catch (e) {
-      this.presentAlert('Error', 'Error al eliminar producto: ' + JSON.stringify(e));
-    }
-  }
-
-  // Métodos CRUD para Order
-  async getAllOrders() {
-    try {
-      const orders: Order[] = [];
-      const data = await this.database.executeSql('SELECT * FROM orders', []);
-      for (let i = 0; i < data.rows.length; i++) {
-        orders.push(data.rows.item(i));
-      }
-      this.listOrders.next(orders);
-    } catch (e) {
-      this.presentAlert('Error', 'Error al obtener órdenes: ' + JSON.stringify(e));
-    }
-  }
-
-  async addOrder(order: Order) {
-    try {
-      const data = await this.database.executeSql(
-        'INSERT INTO orders (userId, tableNumber, status, notes, totalAmount, paymentMethod) VALUES (?, ?, ?, ?, ?, ?)',
-        [order.userId, order.tableNumber, order.status, order.notes, order.totalAmount, order.paymentMethod]
-      );
-      this.getAllOrders();
-    } catch (e) {
-      this.presentAlert('Error', 'Error al añadir orden: ' + JSON.stringify(e));
-    }
-  }
-
-  async updateOrder(order: Order) {
-    try {
-      const data = await this.database.executeSql(
-        'UPDATE orders SET userId=?, tableNumber=?, status=?, notes=?, totalAmount=?, paymentMethod=? WHERE id=?',
-        [order.userId, order.tableNumber, order.status, order.notes, order.totalAmount, order.paymentMethod, order.id]
-      );
-      this.getAllOrders();
-    } catch (e) {
-      this.presentAlert('Error', 'Error al actualizar orden: ' + JSON.stringify(e));
-    }
-  }
-
-  async deleteOrder(id: number) {
-    try {
-      const data = await this.database.executeSql('DELETE FROM orders WHERE id = ?', [id]);
-      this.getAllOrders();
-    } catch (e) {
-      this.presentAlert('Error', 'Error al eliminar orden: ' + JSON.stringify(e));
-    }
-  }
-
-  // Métodos adicionales útiles
-
-  async getUserById(id: number): Promise<User | undefined> {
-    try {
-      const data = await this.database.executeSql('SELECT * FROM user WHERE id = ?', [id]);
-      return data.rows.item(0);
-    } catch (e) {
-      this.presentAlert('Error', 'Error al obtener usuario por ID: ' + JSON.stringify(e));
-      return undefined;
-    }
-  }
-
-  async getProductById(id: number): Promise<Product | undefined> {
-    try {
-      const data = await this.database.executeSql('SELECT * FROM product WHERE id = ?', [id]);
-      return data.rows.item(0);
-    } catch (e) {
-      this.presentAlert('Error', 'Error al obtener producto por ID: ' + JSON.stringify(e));
-      return undefined;
-    }
-  }
-
-  async getOrderById(id: number): Promise<Order | undefined> {
-    try {
-      const data = await this.database.executeSql('SELECT * FROM orders WHERE id = ?', [id]);
-      return data.rows.item(0);
-    } catch (e) {
-      this.presentAlert('Error', 'Error al obtener orden por ID: ' + JSON.stringify(e));
-      return undefined;
-    }
-  }
-
-  async getOrdersByUserId(userId: number): Promise<Order[]> {
-    try {
-      const orders: Order[] = [];
-      const data = await this.database.executeSql('SELECT * FROM orders WHERE userId = ?', [userId]);
-      for (let i = 0; i < data.rows.length; i++) {
-        orders.push(data.rows.item(i));
-      }
-      return orders;
-    } catch (e) {
-      this.presentAlert('Error', 'Error al obtener órdenes por usuario: ' + JSON.stringify(e));
-      return [];
-    }
-  }
-
-  async getProductsByCategory(category: string): Promise<Product[]> {
-    try {
-      const products: Product[] = [];
-      const data = await this.database.executeSql('SELECT * FROM product WHERE category = ?', [category]);
-      for (let i = 0; i < data.rows.length; i++) {
-        products.push(data.rows.item(i));
-      }
-      return products;
-    } catch (e) {
-      this.presentAlert('Error', 'Error al obtener productos por categoría: ' + JSON.stringify(e));
-      return [];
-    }
-  }
+  
+  
 }

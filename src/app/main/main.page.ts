@@ -47,26 +47,28 @@ export class MainPage implements OnInit {
     await this.loadProducts();
   }
 
-  async loadProducts() {
-    const loading = await this.loadingController.create({
+  loadProducts() {
+    this.loadingController.create({
       message: 'Cargando productos...',
+    }).then(loading => {
+      loading.present();
+  
+      this.databaseService.getAllProducts().subscribe({
+        next: (dbProducts) => {
+          this.products = dbProducts.map(product => ({
+            ...product,
+            showOptions: false,
+            selectedSize: 'medium',
+            selectedMilk: 'regular'
+          }));
+        },
+        error: (error) => {
+          console.error('Error loading products:', error);
+          this.presentToast('Error al cargar los productos. Por favor, intente de nuevo.');
+        },
+        complete: () => loading.dismiss(),
+      });
     });
-    await loading.present();
-
-    try {
-      const dbProducts = await this.databaseService.getAllProducts();
-      this.products = dbProducts.map(product => ({
-        ...product,
-        showOptions: false,
-        selectedSize: 'medium',
-        selectedMilk: 'regular'
-      }));
-    } catch (error) {
-      console.error('Error loading products:', error);
-      await this.presentToast('Error al cargar los productos. Por favor, intente de nuevo.');
-    } finally {
-      await loading.dismiss();
-    }
   }
 
   get isLoggedIn(): boolean {

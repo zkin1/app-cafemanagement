@@ -119,7 +119,6 @@ export class CarroComprasPage implements OnInit {
       return;
     }
 
-    // Asegurarse de que tableNumber tenga un valor antes de confirmar
     if (this.currentOrder.tableNumber === null) {
       await this.presentToast('Por favor, seleccione un número de mesa antes de confirmar la orden.');
       return;
@@ -131,14 +130,11 @@ export class CarroComprasPage implements OnInit {
     await loading.present();
 
     try {
-      // Get the current user ID from localStorage
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       this.currentOrder.userId = currentUser.id;
 
-      // Create the order in the database
       const orderId = await this.databaseService.createOrder(this.currentOrder);
 
-      // Add order details
       for (const item of this.currentOrderItems) {
         const orderDetail: OrderDetail = {
           orderId: orderId,

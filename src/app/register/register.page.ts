@@ -1,15 +1,17 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { DatabaseService } from '../services/database.service';
-import { ToastController } from '@ionic/angular';
+import { ToastController, LoadingController } from '@ionic/angular';
 import { User } from '../models/user.model';
+import { Subscription, Observable, from } from 'rxjs';
+import { mergeMap, map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-register',
   templateUrl: './register.page.html',
   styleUrls: ['./register.page.scss'],
 })
-export class RegisterPage {
+export class RegisterPage implements OnDestroy {
   showToast: boolean = false;
   toastMessage: string = '';
   name: string = '';
@@ -17,11 +19,18 @@ export class RegisterPage {
   password: string = '';
   confirmPassword: string = '';
 
+  private subscriptions: Subscription = new Subscription();
+
   constructor(
     private router: Router,
     private databaseService: DatabaseService,
-    private toastController: ToastController
+    private toastController: ToastController,
+    private loadingController: LoadingController
   ) {}
+
+  ngOnDestroy() {
+    this.subscriptions.unsubscribe();
+  }
 
   async onSubmit() {
     if (!this.isFormValid()) {
@@ -34,8 +43,13 @@ export class RegisterPage {
       return;
     }
 
+    const loading = await this.loadingController.create({
+      message: 'Registrando usuario...',
+    });
+    await loading.present();
+
     try {
-      const existingUser = await this.databaseService.getUserByEmail(this.email);
+      const existingUser = await this.getUserByEmail(this.email);
       if (existingUser) {
         await this.presentToast('El email ya está registrado. Por favor, use otro.');
         return;
@@ -49,8 +63,8 @@ export class RegisterPage {
         username: this.email, // Using email as username for simplicity
       };
 
-      const userId = await this.databaseService.createUser(newUser);
-      if (userId) {
+      const userId = await this.createUser(newUser);
+      if (userId !== undefined) {
         await this.presentToast('Registro exitoso. Por favor, inicie sesión.');
         this.router.navigate(['/login']);
       } else {
@@ -59,11 +73,31 @@ export class RegisterPage {
     } catch (error) {
       console.error('Error during registration:', error);
       await this.presentToast('Ocurrió un error durante el registro. Por favor, intente de nuevo.');
+    } finally {
+      await loading.dismiss();
     }
   }
 
   private isFormValid(): boolean {
     return !!(this.name && this.email && this.password && this.confirmPassword);
+  }
+
+  private getUserByEmail(email: string): Promise<User | null> {
+    const result = this.databaseService.getUserByEmail(email);
+    
+    if (result instanceof Observable) {
+      return result.toPromise().then(res => res !== undefined ? res : null);
+    }
+  
+    return Promise.resolve(result !== undefined ? result : null);
+  }
+
+  private createUser(user: User): Promise<number | undefined> {
+    const result = this.databaseService.createUser(user);
+    if (result instanceof Observable) {
+      return result.toPromise();
+    }
+    return result;
   }
 
   async presentToast(message: string) {
@@ -72,6 +106,6 @@ export class RegisterPage {
       duration: 2000,
       position: 'top'
     });
-    toast.present();
+    await toast.present();
   }
 }

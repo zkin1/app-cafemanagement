@@ -1,19 +1,24 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { DatabaseService } from '../services/database.service';
 import { ToastController, LoadingController, AlertController } from '@ionic/angular';
 import { User } from '../models/user.model';
+import { Subscription, Observable, from, of } from 'rxjs';
+import { mergeMap, map, catchError } from 'rxjs/operators';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-employee-management',
   templateUrl: './employee-management.page.html',
   styleUrls: ['./employee-management.page.scss'],
 })
-export class EmployeeManagementPage implements OnInit {
+export class EmployeeManagementPage implements OnInit, OnDestroy {
 
   showToast: boolean = false;
   toastMessage: string = '';
   users: User[] = [];
   editingUser: User | null = null;
+
+  private subscriptions: Subscription = new Subscription();
 
   constructor(
     private databaseService: DatabaseService,
@@ -22,8 +27,12 @@ export class EmployeeManagementPage implements OnInit {
     private alertController: AlertController
   ) { }
 
-  async ngOnInit() {
-    await this.loadUsers();
+  ngOnInit() {
+    this.loadUsers();
+  }
+
+  ngOnDestroy() {
+    this.subscriptions.unsubscribe();
   }
 
   async loadUsers() {
@@ -33,13 +42,33 @@ export class EmployeeManagementPage implements OnInit {
     await loading.present();
 
     try {
-      this.users = await this.databaseService.getAllUsers();
+      this.users = await this.getAllUsers();
     } catch (error) {
       console.error('Error al cargar empleados:', error);
       this.presentToast('Error al cargar empleados. Por favor, intente de nuevo.');
     } finally {
-      loading.dismiss();
+      await loading.dismiss();
     }
+  }
+
+  private async getAllUsers(): Promise<User[]> {
+    const result = this.databaseService.getAllUsers();
+  
+    if (result instanceof Observable) {
+      try {
+        // Convertimos el Observable en Promise y retornamos el valor
+        const users = await firstValueFrom(result.pipe(
+          map(users => users || []), 
+          catchError(() => of([])) 
+        ));
+        return users;
+      } catch (error) {
+        return []; 
+      }
+    }
+  
+    // Si result no es un Observable, retornamos el valor asegurando un array
+    return Promise.resolve(result || []);
   }
 
   async addUser() {
@@ -72,47 +101,64 @@ export class EmployeeManagementPage implements OnInit {
         { text: 'Cancelar', role: 'cancel' },
         {
           text: 'Añadir',
-          handler: async (data) => {
-            if (!data.name || !data.email || !data.password || !data.role) {
-              this.presentToast('Por favor, complete todos los campos');
-              return false; // Mantiene la alerta abierta
-            }
-  
-            const newUser: User = {
-              name: data.name,
-              email: data.email,
-              password: data.password,
-              role: data.role,
-              username: data.email // Usamos el email como username por simplicidad
-            };
-  
-            const loading = await this.loadingController.create({
-              message: 'Añadiendo empleado...',
-            });
-            await loading.present();
-  
-            try {
-              const userId = await this.databaseService.createUser(newUser);
-              newUser.id = userId;
-              this.users.push(newUser);
-              this.presentToast('Empleado añadido con éxito');
-              return true; // Cierra la alerta
-            } catch (error) {
-              console.error('Error al añadir empleado:', error);
-              this.presentToast('Error al añadir empleado. Por favor, intente de nuevo.');
-              return false; // Mantiene la alerta abierta en caso de error
-            } finally {
-              loading.dismiss();
-            }
+          handler: (data) => {
+            this.createNewUser(data);
           }
         }
       ]
     });
-  
+
     await alert.present();
   }
 
-  async editUser(user: User) {
+  private async createNewUser(data: any) {
+    if (!data.name || !data.email || !data.password || !data.role) {
+      this.presentToast('Por favor, complete todos los campos');
+      return;
+    }
+
+    const loading = await this.loadingController.create({
+      message: 'Añadiendo empleado...',
+    });
+    await loading.present();
+
+    const newUser: User = {
+      name: data.name,
+      email: data.email,
+      password: data.password,
+      role: data.role,
+      username: data.email
+    };
+
+    try {
+      const userId = await this.createUser(newUser);
+      if (userId !== undefined) {
+        newUser.id = userId;
+        this.users.push(newUser);
+        this.presentToast('Empleado añadido con éxito');
+      } else {
+        throw new Error('No se pudo crear el usuario');
+      }
+    } catch (error) {
+      console.error('Error al añadir empleado:', error);
+      this.presentToast('Error al añadir empleado. Por favor, intente de nuevo.');
+    } finally {
+      await loading.dismiss();
+    }
+  }
+
+  private createUser(user: User): Promise<number | undefined> {
+    const result = this.databaseService.createUser(user);
+    if (result instanceof Observable) {
+      return result.pipe(
+        map(id => id),
+        catchError(() => of(undefined))
+      ).toPromise();
+    }
+    return Promise.resolve(result);
+  }
+
+  editUser(user: User) {
     this.editingUser = { ...user };
   }
 
@@ -125,20 +171,41 @@ export class EmployeeManagementPage implements OnInit {
     await loading.present();
 
     try {
-      await this.databaseService.updateUser(this.editingUser);
-      const index = this.users.findIndex(u => u.id === this.editingUser!.id);
-      if (index !== -1) {
-        this.users[index] = { ...this.editingUser };
+      const success = await this.updateUser(this.editingUser);
+      if (success) {
+        const index = this.users.findIndex(u => u.id === this.editingUser!.id);
+        if (index !== -1) {
+          this.users[index] = { ...this.editingUser };
+        }
+        this.presentToast('Usuario actualizado con éxito');
+        this.editingUser = null;
+      } else {
+        throw new Error('No se pudo actualizar el usuario');
       }
-      this.presentToast('Usuario actualizado con éxito');
-      this.editingUser = null;
     } catch (error) {
       console.error('Error al actualizar usuario:', error);
       this.presentToast('Error al actualizar usuario. Por favor, intente de nuevo.');
     } finally {
-      loading.dismiss();
+      await loading.dismiss();
     }
   }
+
+  private updateUser(user: User): Promise<boolean> {
+    const result = this.databaseService.updateUserFromDb(user);
+  
+    if (result instanceof Observable) {
+      return result.pipe(
+        map(() => true), // Si el observable es exitoso, retornamos `true`
+        catchError(() => of(false)) // En caso de error, devolvemos `false`
+      )
+      .toPromise()
+      .then(res => res !== undefined ? res : false); // Garantizamos que no se devuelva `undefined`
+    }
+  
+    // Aseguramos que si `result` es `undefined`, devolvemos `false`
+    return Promise.resolve(result !== undefined ? true : false);
+  }
+  
 
   async deleteUser(user: User) {
     const alert = await this.alertController.create({
@@ -148,22 +215,8 @@ export class EmployeeManagementPage implements OnInit {
         { text: 'Cancelar', role: 'cancel' },
         {
           text: 'Eliminar',
-          handler: async () => {
-            const loading = await this.loadingController.create({
-              message: 'Eliminando empleado...',
-            });
-            await loading.present();
-
-            try {
-              await this.databaseService.deleteUser(user.id!);
-              this.users = this.users.filter(u => u.id !== user.id);
-              this.presentToast('Empleado eliminado con éxito');
-            } catch (error) {
-              console.error('Error al eliminar empleado:', error);
-              this.presentToast('Error al eliminar empleado. Por favor, intente de nuevo.');
-            } finally {
-              loading.dismiss();
-            }
+          handler: () => {
+            this.performUserDeletion(user);
           }
         }
       ]
@@ -172,13 +225,50 @@ export class EmployeeManagementPage implements OnInit {
     await alert.present();
   }
 
+  private async performUserDeletion(user: User) {
+    const loading = await this.loadingController.create({
+      message: 'Eliminando empleado...',
+    });
+    await loading.present();
+
+    try {
+      const success = await this.deleteUserFromDb(user.id!);
+      if (success) {
+        this.users = this.users.filter(u => u.id !== user.id);
+        this.presentToast('Empleado eliminado con éxito');
+      } else {
+        throw new Error('No se pudo eliminar el usuario');
+      }
+    } catch (error) {
+      console.error('Error al eliminar empleado:', error);
+      this.presentToast('Error al eliminar empleado. Por favor, intente de nuevo.');
+    } finally {
+      await loading.dismiss();
+    }
+  }
+
+  private async deleteUserFromDb(userId: number): Promise<boolean> {
+    const result = this.databaseService.deleteUser(userId);
+
+    if (result instanceof Observable) {
+      try {
+        await firstValueFrom(result);
+        return true; 
+      } catch (error) {
+        return false; 
+      }
+    }
+    return Promise.resolve(result !== undefined && result !== false);
+  }
+  
+
   async presentToast(message: string) {
     const toast = await this.toastController.create({
       message: message,
       duration: 2000,
       position: 'top'
     });
-    toast.present();
+    await toast.present();
   }
 
   cancelEdit() {
