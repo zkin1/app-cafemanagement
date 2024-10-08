@@ -50,20 +50,25 @@ export class AppComponent {
   }
 
   async initializeApp() {
-    await this.platform.ready();
-    console.log('Platform ready');
-    console.log('Is native platform:', Capacitor.isNativePlatform());
-  
     try {
+      await this.platform.ready();
+      console.log('Platform ready');
+      console.log('Is native platform:', Capacitor.isNativePlatform());
+  
       console.log('Initializing database...');
       await this.databaseService.initializeDatabase();
       console.log('Database initialized successfully');
   
-      // Esperar a que la base de datos esté lista
-      this.databaseService.dbState().subscribe(async (isReady) => {
-        if (isReady) {
-          console.log('Database is ready');
-          await this.checkAndInsertSeedData();
+      this.databaseService.dbState().subscribe({
+        next: async (isReady) => {
+          if (isReady) {
+            console.log('Database is ready');
+            await this.checkAndInsertSeedData();
+          }
+        },
+        error: (error) => {
+          console.error('Error in dbState subscription:', error);
+          this.presentAlert('Error', 'Database state subscription error');
         }
       });
   

@@ -6,7 +6,7 @@ import { AppComponent } from './app.component';
 import { AppRoutingModule } from './app-routing.module';
 import { DatabaseService } from './services/database.service';
 import { SQLite } from '@awesome-cordova-plugins/sqlite/ngx';
-import { AlertController } from '@ionic/angular';
+import { Capacitor } from '@capacitor/core';
 
 @NgModule({
   declarations: [AppComponent],
@@ -19,7 +19,7 @@ import { AlertController } from '@ionic/angular';
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     DatabaseService,
     SQLite,
-    AlertController
+    { provide: 'PLATFORM', useValue: Capacitor }
   ],
   bootstrap: [AppComponent]
 })
