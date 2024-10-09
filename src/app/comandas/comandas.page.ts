@@ -39,11 +39,14 @@ export class ComandasPage implements OnInit, OnDestroy {
       message: 'Cargando órdenes...',
     });
     await loading.present();
-
+  
     try {
       const ordenes = await this.getOrdersByStatus(['Solicitado', 'En proceso', 'Listo']);
-      this.ordenes = ordenes;
-      await this.cargarDetallesOrdenes();
+      this.ordenes = await Promise.all(ordenes.map(async (orden) => {
+        const detalles = await this.getOrderDetails(orden.id!);
+        return { ...orden, items: detalles };
+      }));
+      console.log('Órdenes cargadas:', this.ordenes);  // Para depuración
     } catch (error) {
       console.error('Error al cargar órdenes:', error);
       this.presentToast('Error al cargar órdenes. Por favor, intente de nuevo.');

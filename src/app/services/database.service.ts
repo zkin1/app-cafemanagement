@@ -30,10 +30,18 @@ export class DatabaseService {
 
   async initializeDatabase() {
     try {
+      // Eliminar la base de datos existente si existe
+      await this.sqlite.deleteDatabase({
+        name: 'cafeteria.db',
+        location: 'default'
+      });
+  
+      // Crear una nueva base de datos
       this.database = await this.sqlite.create({
         name: 'cafeteria.db',
         location: 'default'
       });
+  
       await this.createTables();
       await firstValueFrom(this.insertSeedData());
       this.dbReady.next(true);
@@ -349,19 +357,20 @@ export class DatabaseService {
   }
 
   getOrderDetails(orderId: number): Observable<OrderDetail[]> {
-    return new Observable(observer => {
-      const sql = 'SELECT * FROM OrderDetails WHERE OrderID = ?';
-      this.database.executeSql(sql, [orderId])
-        .then(data => {
-          let orderDetails: OrderDetail[] = [];
-          for (let i = 0; i < data.rows.length; i++) {
-            orderDetails.push(data.rows.item(i));
-          }
-          observer.next(orderDetails);
-          observer.complete();
-        })
-        .catch(e => observer.error(e));
-    });
+    return from(this.database.executeSql(`
+      SELECT od.*, p.Name, p.ImageURL 
+      FROM OrderDetails od
+      JOIN Products p ON od.ProductID = p.ProductID
+      WHERE od.OrderID = ?
+    `, [orderId])).pipe(
+      map(data => {
+        let orderDetails: OrderDetail[] = [];
+        for (let i = 0; i < data.rows.length; i++) {
+          orderDetails.push(data.rows.item(i));
+        }
+        return orderDetails;
+      })
+    );
   }
 
   updateOrderStatus(orderId: number, status: string): Observable<boolean> {
@@ -513,52 +522,33 @@ export class DatabaseService {
     ];
   
     return forkJoin([
-      from(this.database.executeSql('SELECT COUNT(*) as count FROM Users', [])),
-      from(this.database.executeSql('SELECT COUNT(*) as count FROM Products', []))
+      from(this.database.executeSql('DELETE FROM Users', [])),
+      from(this.database.executeSql('DELETE FROM Products', []))
     ]).pipe(
-      map(([userResult, productResult]) => {
-        const userCount = userResult.rows.item(0).count;
-        const productCount = productResult.rows.item(0).count;
-        return userCount === 0 || productCount === 0;
-      }),
-      switchMap(shouldInsert => {
-        if (shouldInsert) {
-          console.log('Insertando datos de ejemplo...');
-          const userInserts = users.map(user => 
-            this.database.executeSql(
-              'INSERT OR IGNORE INTO Users (Username, Password, Role, Name, Email) VALUES (?, ?, ?, ?, ?)', 
-              [user.username, user.password, user.role, user.name, user.email]
-            )
-          );
+      switchMap(() => {
+        const userInserts = users.map(user => 
+          this.database.executeSql(
+            'INSERT INTO Users (Username, Password, Role, Name, Email) VALUES (?, ?, ?, ?, ?)', 
+            [user.username, user.password, user.role, user.name, user.email]
+          )
+        );
   
-          const productInserts = products.map(product => 
-            this.database.executeSql(
-              'INSERT OR IGNORE INTO Products (Name, Description, Price, Category, ImageURL, IsAvailable) VALUES (?, ?, ?, ?, ?, ?)', 
-              [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0]
-            )
-          );
+        const productInserts = products.map(product => 
+          this.database.executeSql(
+            'INSERT INTO Products (Name, Description, Price, Category, ImageURL, IsAvailable) VALUES (?, ?, ?, ?, ?, ?)', 
+            [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0]
+          )
+        );
   
-          return forkJoin([...userInserts, ...productInserts]);
-        }
-        return of(null);
+        return forkJoin([...userInserts, ...productInserts]);
       }),
-      map(result => {
-        if (result) {
-          console.log('Seed data inserted successfully');
-          // Verificar los datos insertados
-          this.getAllUsers().subscribe(users => console.log('Users after seed:', users));
-          this.getAllProducts().subscribe(products => console.log('Products after seed:', products));
-          return true;
-        } else {
-          console.log('Seed data already exists');
-          return false;
-        }
-      }),
+      map(() => true),
       catchError(error => {
         console.error('Error in insertSeedData:', error);
         return of(false);
       })
     );
   }
+
   
 }
