@@ -399,27 +399,26 @@ export class DatabaseService {
       );
   }
   public updateUserFromDb(user: User): Promise<boolean> {
-    const sql = 'UPDATE Users SET Username = ?, Name = ?, Email = ?, Role = ? WHERE UserID = ?';
-    const data = [user.Username, user.Name, user.Email, user.Role, user.UserID];
+    const sql = 'UPDATE Users SET Username = ?, Name = ?, Email = ? WHERE UserID = ?';
+    const data = [user.Username, user.Name, user.Email, user.UserID];
   
-    // Realiza la consulta SQL directamente usando `executeSql`
     const result = new Observable<boolean>(observer => {
       this.database.executeSql(sql, data)
         .then(() => {
-          observer.next(true);  // Si la operación es exitosa, emitimos `true`
+          observer.next(true);
           observer.complete();
         })
         .catch(error => {
-          observer.error(error); // Si ocurre un error, lo manejamos
+          observer.error(error);
         });
     });
   
     return result.pipe(
-      map(() => true), // Retornamos `true` si la operación fue exitosa
-      catchError(() => of(false)) // En caso de error, retornamos `false`
+      map(() => true),
+      catchError(() => of(false))
     )
     .toPromise()
-    .then(res => res !== undefined ? res : false); // Aseguramos que nunca se retorne `undefined`
+    .then(res => res !== undefined ? res : false);
   }
   
 

@@ -56,9 +56,6 @@ export class PerfilPage implements OnInit, OnDestroy {
       this.usuario = await this.getUserById(userId);
       this.esAdmin = this.usuario.Role === 'admin';
       
-      // Actualiza la información en el localStorage
-      localStorage.setItem('currentUser', JSON.stringify(this.usuario));
-      
       console.log('Usuario cargado:', this.usuario);
       console.log('Es admin:', this.esAdmin);
     } catch (error) {
@@ -91,10 +88,15 @@ export class PerfilPage implements OnInit, OnDestroy {
       message: 'Actualizando perfil...',
     });
     await loading.present();
-
+  
     try {
+      // Guardamos el rol actual antes de la actualización
+      const currentRole = this.usuario.Role;
+  
       const success = await this.updateUser(this.usuario);
       if (success) {
+        // Aseguramos que el rol no haya cambiado
+        this.usuario.Role = currentRole;
         await this.presentToast('Perfil actualizado con éxito');
       } else {
         throw new Error('No se pudo actualizar el perfil');
