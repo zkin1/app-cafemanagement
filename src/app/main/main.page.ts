@@ -126,25 +126,26 @@ export class MainPage implements OnInit {
       this.router.navigate(['/login']);
       return;
     }
-
+  
     const existingItemIndex = this.currentOrderItems.findIndex(item => 
       item.id === product.id && 
       item.selectedSize === product.selectedSize && 
       item.selectedMilk === product.selectedMilk
     );
-
+  
     if (existingItemIndex !== -1) {
       this.currentOrderItems[existingItemIndex].quantity += 1;
     } else {
       this.currentOrderItems.push({
         ...product,
         quantity: 1,
-        finalPrice: this.calculatePrice(product)
+        finalPrice: this.calculatePrice(product),
+        image: product.imageURL  // Añadimos la URL de la imagen aquí
       });
     }
-
+  
     product.showOptions = false;
-
+  
     await this.presentToast(`${product.name} (${product.selectedSize}, ${product.selectedMilk}) añadido a la orden #${this.currentOrderNumber}`);
     this.updateLocalStorage();
   }

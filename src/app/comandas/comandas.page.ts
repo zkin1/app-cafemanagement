@@ -64,46 +64,54 @@ export class ComandasPage implements OnInit, OnDestroy {
   }
 
   async cargarDetallesOrdenes() {
-    const detallesObservables = this.ordenes.map(orden =>
-      from(this.getOrderDetails(orden.id!)).pipe(
-        mergeMap(detalles => {
-          orden.items = detalles;
-          return [orden];
-        })
-      )
-    );
-
-    this.subscriptions.add(
-      from(detallesObservables).pipe(
-        mergeMap(obs => obs),
-        toArray()
-      ).subscribe(
-        () => {},
-        error => console.error('Error al cargar detalles de órdenes:', error)
-      )
-    );
+    const detallesPromises = this.ordenes.map(async (orden) => {
+      try {
+        const detalles = await this.getOrderDetails(orden.id!);
+        orden.items = detalles;
+        return orden;
+      } catch (error) {
+        console.error(`Error al cargar detalles para la orden ${orden.id}:`, error);
+        return orden;
+      }
+    });
+  
+    try {
+      this.ordenes = await Promise.all(detallesPromises);
+      console.log('Órdenes con detalles:', this.ordenes);  // Para depuración
+    } catch (error) {
+      console.error('Error al cargar detalles de órdenes:', error);
+    }
   }
 
-  private getOrderDetails(orderId: number): Promise<OrderDetail[]> {
-    const result = this.databaseService.getOrderDetails(orderId);
-    if (result instanceof Observable) {
-      return result.pipe(
-        map(details => details || []),
-        catchError(() => of([]))
-      ).toPromise().then(value => value ?? []);
+  private async getOrderDetails(orderId: number): Promise<OrderDetail[]> {
+    try {
+      const result = this.databaseService.getOrderDetails(orderId);
+      if (result instanceof Observable) {
+        return await firstValueFrom(result.pipe(
+          map(details => details || []),
+          catchError(() => of([]))
+        ));
+      }
+      return result || [];
+    } catch (error) {
+      console.error(`Error al obtener detalles de la orden ${orderId}:`, error);
+      return [];
     }
-    return Promise.resolve(result || []);
   }
 
   async cambiarEstado(orden: Order, nuevoEstado: 'En proceso' | 'Listo' | 'Cancelado' | 'Entregado') {
+    if (!orden.id) {
+      this.presentToast('Error: ID de orden no válido');
+      return;
+    }
+  
     try {
-      await this.updateOrderStatus(orden.id!, nuevoEstado);
+      await this.updateOrderStatus(orden.id, nuevoEstado);
       orden.status = nuevoEstado;
       this.presentToast(`Orden #${orden.id} actualizada a ${nuevoEstado}`);
   
-      // Actualiza la lista de órdenes si el estado es Entregado o Cancelado
       if (nuevoEstado === 'Entregado' || nuevoEstado === 'Cancelado') {
-        await this.cargarOrdenes(); // Vuelve a cargar todas las órdenes
+        await this.cargarOrdenes();
       }
     } catch (error) {
       console.error('Error al actualizar estado de la orden:', error);
@@ -111,15 +119,14 @@ export class ComandasPage implements OnInit, OnDestroy {
     }
   }
 
-  private updateOrderStatus(orderId: number, status: string): Promise<void> {
+  private async updateOrderStatus(orderId: number, status: string): Promise<void> {
     const result = this.databaseService.updateOrderStatus(orderId, status);
     if (result instanceof Observable) {
-      return result.pipe(
+      await firstValueFrom(result.pipe(
         map(() => {}),
         catchError(() => of(undefined))
-      ).toPromise();
+      ));
     }
-    return Promise.resolve();
   }
 
   async presentToast(message: string) {
@@ -132,6 +139,6 @@ export class ComandasPage implements OnInit, OnDestroy {
   }
 
   getOrderTotal(orden: Order): number {
-    return orden.items?.reduce((total, item) => total + (item.price * item.quantity), 0) || 0;
+    return orden.items?.reduce((total, item) => total + ((item.price || 0) * (item.quantity || 0)), 0) || 0;
   }
 }

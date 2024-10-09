@@ -118,23 +118,35 @@ export class CarroComprasPage implements OnInit {
       await this.presentToast('No hay productos en la orden. Añada productos antes de confirmar.');
       return;
     }
-
+  
     if (this.currentOrder.tableNumber === null) {
       await this.presentToast('Por favor, seleccione un número de mesa antes de confirmar la orden.');
       return;
     }
-
+  
     const loading = await this.loadingController.create({
       message: 'Procesando orden...',
     });
     await loading.present();
-
+  
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       this.currentOrder.userId = currentUser.id;
-
-      const orderId = await this.databaseService.createOrder(this.currentOrder);
-
+  
+      // Creamos la orden sin los items primero
+      const orderToSave: Order = {
+        userId: this.currentOrder.userId,
+        orderNumber: this.currentOrder.orderNumber,
+        tableNumber: this.currentOrder.tableNumber,
+        status: 'Solicitado',
+        notes: this.currentOrder.notes,
+        totalAmount: this.calculateTotal(),
+        paymentMethod: '',
+      };
+  
+      const orderId = await this.databaseService.createOrder(orderToSave);
+  
+      // Ahora añadimos los items de la orden
       for (const item of this.currentOrderItems) {
         const orderDetail: OrderDetail = {
           orderId: orderId,
@@ -146,7 +158,7 @@ export class CarroComprasPage implements OnInit {
         };
         await this.databaseService.addProductToOrder(orderDetail);
       }
-
+  
       await loading.dismiss();
       await this.presentToast('Orden confirmada con éxito');
       localStorage.removeItem('currentOrder');

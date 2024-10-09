@@ -10,12 +10,12 @@
 <ion-content class="ion-padding">
   <ion-card *ngFor="let orden of ordenes" class="orden-card">
     <ion-card-header>
-      <ion-card-title>Orden #{{ orden.id }} - Mesa {{ orden.tableNumber }}</ion-card-title>
+      <ion-card-title>Orden #{{ orden.id || 'N/A' }} - Mesa {{ orden.tableNumber || 'N/A' }}</ion-card-title>
       <ion-card-subtitle>
-        <ion-badge [color]="orden.status=== 'Solicitado' ? 'warning' : 
-                            orden.status=== 'En proceso' ? 'primary' : 
-                            orden.status=== 'Listo' ? 'success' : 'danger'">
-          {{ orden.status}}
+        <ion-badge [color]="orden.status === 'Solicitado' ? 'warning' : 
+                            orden.status === 'En proceso' ? 'primary' : 
+                            orden.status === 'Listo' ? 'success' : 'danger'">
+          {{ orden.status || 'Desconocido' }}
         </ion-badge>
       </ion-card-subtitle>
     </ion-card-header>
@@ -23,17 +23,21 @@
     <ion-card-content>
       <div class="items-list">
         <p *ngFor="let item of orden.items">
-          {{ item.name }} x{{ item.quantity }}
-          <span *ngIf="item.milkType || item.size" class="item-details">
-            ({{ item.size || 'Tamano estandar' }}
+          {{ item.name || 'Producto desconocido' }} x{{ item.quantity || 0 }}
+          <span *ngIf="item.size || item.milkType" class="item-details">
+            ({{ item.size || 'Tamaño estándar' }}
             <ng-container *ngIf="item.milkType">, leche {{ item.milkType }}</ng-container>)
           </span>
+          <ion-note slot="end">{{ (item.price * item.quantity) | currency:'CLP':'symbol-narrow':'1.0-0' }}</ion-note>
         </p>
       </div>
-      <p class="totalAmount">totalAmount: {{ orden.totalAmount | currency:'CLP':'symbol-narrow':'1.0-0' }}</p>
+      <p class="total-amount">
+        <strong>Total:</strong> 
+        <ion-note slot="end" color="primary">{{ getOrderTotal(orden) | currency:'CLP':'symbol-narrow':'1.0-0' }}</ion-note>
+      </p>
       <p *ngIf="orden.notes" class="notes">
         <ion-icon name="create-outline"></ion-icon>
-        notes: {{ orden.notes }}
+        <strong>Notas:</strong> {{ orden.notes }}
       </p>
     </ion-card-content>
 
@@ -49,7 +53,20 @@
       </ion-button>
     </div>
   </ion-card>
+
+  <ion-item *ngIf="ordenes.length === 0">
+    <ion-label>
+      No hay órdenes pendientes en este momento.
+    </ion-label>
+  </ion-item>
 </ion-content>
+
+<ion-footer *ngIf="ordenes.length > 0">
+  <ion-toolbar>
+    <ion-title>Total de órdenes: {{ ordenes.length }}</ion-title>
+  </ion-toolbar>
+</ion-footer>
+
 <ion-toast
   [isOpen]="showToast"
   [message]="toastMessage"

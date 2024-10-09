@@ -333,17 +333,18 @@ export class DatabaseService {
     return topProducts;
   }
 
-  addProductToOrder(orderDetail: OrderDetail): Observable<number> {
-    return new Observable(observer => {
+  addProductToOrder(orderDetail: OrderDetail): Promise<number> {
+    return new Promise((resolve, reject) => {
       const sql = 'INSERT INTO OrderDetails (OrderID, ProductID, Quantity, Size, MilkType, Price) VALUES (?, ?, ?, ?, ?, ?)';
-      const data = [orderDetail.orderId, orderDetail.productId, orderDetail.quantity, orderDetail.size, orderDetail.milkType, orderDetail.price];
+      const values = [orderDetail.orderId, orderDetail.productId, orderDetail.quantity, orderDetail.size, orderDetail.milkType, orderDetail.price];
       
-      this.database.executeSql(sql, data)
-        .then(res => {
-          observer.next(res.insertId);
-          observer.complete();
+      this.database.executeSql(sql, values)
+        .then(data => {
+          resolve(data.insertId);
         })
-        .catch(e => observer.error(e));
+        .catch(error => {
+          reject(error);
+        });
     });
   }
 
