@@ -30,11 +30,6 @@ export class DatabaseService {
 
   async initializeDatabase() {
     try {
-      // Eliminar la base de datos existente si existe
-      await this.sqlite.deleteDatabase({
-        name: 'cafeteria.db',
-        location: 'default'
-      });
   
       // Crear una nueva base de datos
       this.database = await this.sqlite.create({
@@ -50,9 +45,6 @@ export class DatabaseService {
       this.presentAlert('Error', 'Failed to initialize the database. Please try again.');
     }
   }
-
-
-
 
   // Tablas
   tableUsers: string = `
@@ -159,13 +151,18 @@ export class DatabaseService {
 
   async createTables() {
     try {
+      await this.database.executeSql('DROP TABLE IF EXISTS Users', []);
+      await this.database.executeSql('DROP TABLE IF EXISTS Products', []);
+      await this.database.executeSql('DROP TABLE IF EXISTS Orders', []);
+      await this.database.executeSql('DROP TABLE IF EXISTS OrderDetails', []);
+      await this.database.executeSql('DROP TABLE IF EXISTS SalesReports', []);
+  
       await this.database.executeSql(this.tableUsers, []);
       await this.database.executeSql(this.tableProducts, []);
       await this.database.executeSql(this.tableOrders, []);
       await this.database.executeSql(this.tableOrderDetails, []);
       await this.database.executeSql(this.tableSalesReports, []);
   
-      // Insertar datos de ejemplo usando insertSeedData
       await this.insertSeedData().toPromise();
   
       this.loadInitialData();
