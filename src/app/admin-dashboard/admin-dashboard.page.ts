@@ -1,8 +1,7 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { IonicModule } from '@ionic/angular';
-import { RouterLink, Router } from '@angular/router';
+import { Router } from '@angular/router';
+import { LoadingController, ToastController } from '@ionic/angular';
+import { DatabaseService } from '../services/database.service';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -14,20 +13,52 @@ export class AdminDashboardPage implements OnInit {
   orderCount: number = 0;
   activeEmployees: number = 0;
 
-  constructor(private router: Router) { }
+  constructor(
+    private router: Router,
+    private loadingController: LoadingController,
+    private toastController: ToastController,
+    private databaseService: DatabaseService
+  ) { }
 
   ngOnInit() {
     this.loadDashboardData();
   }
 
-  loadDashboardData() {
-    this.adminName = (window as any).currentUser?.name || 'Admin';
-    this.orderCount = Math.floor(Math.random() * 50); 
-    this.activeEmployees = Math.floor(Math.random() * 10); 
+  async loadDashboardData() {
+    const loading = await this.loadingController.create({
+      message: 'Cargando datos...',
+    });
+    await loading.present();
+  
+    try {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      this.adminName = currentUser.name || 'Admin';
+  
+      // Obtener el número real de órdenes del día
+      this.orderCount = await this.databaseService.getOrderCountForToday();
+  
+      // Obtener el número real de empleados activos
+      this.activeEmployees = await this.databaseService.getActiveEmployeesCount();
+  
+    } catch (error) {
+      console.error('Error al cargar datos del dashboard:', error);
+      this.presentToast('Error al cargar datos. Por favor, intente de nuevo.');
+    } finally {
+      loading.dismiss();
+    }
   }
 
   logout() {
-    (window as any).currentUser = null;
+    localStorage.removeItem('currentUser');
     this.router.navigate(['/login']);
+  }
+
+  async presentToast(message: string) {
+    const toast = await this.toastController.create({
+      message: message,
+      duration: 2000,
+      position: 'bottom'
+    });
+    toast.present();
   }
 }

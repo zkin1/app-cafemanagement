@@ -55,7 +55,7 @@ export class CarroComprasPage implements OnInit {
   loadOrder() {
     const storedOrder = JSON.parse(localStorage.getItem('currentOrder') || 'null');
     if (storedOrder) {
-      this.currentOrder.id = storedOrder.orderNumber;
+      this.currentOrder.orderNumber = storedOrder.orderNumber;
       this.currentOrder.items = storedOrder.items;
       this.currentOrderItems = storedOrder.items;
     } else {
@@ -161,8 +161,22 @@ export class CarroComprasPage implements OnInit {
   
       await loading.dismiss();
       await this.presentToast('Orden confirmada con éxito');
+  
+      // Incrementar el número de orden en el almacenamiento local
+      const lastOrderNumber = parseInt(localStorage.getItem('lastOrderNumber') || '0');
+      const newOrderNumber = lastOrderNumber + 1;
+      localStorage.setItem('lastOrderNumber', newOrderNumber.toString());
+      
+      // Limpiar la orden actual
       localStorage.removeItem('currentOrder');
+  
+      // Resetear el contador de items
+      this.currentOrderItems = [];
+      this.updateLocalStorage();
+  
+      // Navegar a la página principal
       this.router.navigate(['/main']);
+  
     } catch (error) {
       console.error('Error al confirmar la orden:', error);
       await loading.dismiss();

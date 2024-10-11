@@ -41,10 +41,28 @@ export class MainPage implements OnInit {
     private databaseService: DatabaseService,
     private toastController: ToastController,
     private loadingController: LoadingController
-  ) {}
+  ) {
+    const lastOrderNumber = parseInt(localStorage.getItem('lastOrderNumber') || '0');
+    this.currentOrderNumber = lastOrderNumber + 1;
+  }
 
-  async ngOnInit() {
-    await this.loadProducts();
+  ngOnInit() {
+    this.loadProducts();
+    this.resetOrderNumber();
+    this.loadCurrentOrder();
+  }
+
+
+  loadCurrentOrder() {
+    const storedOrder = JSON.parse(localStorage.getItem('currentOrder') || 'null');
+    if (storedOrder) {
+      this.currentOrderNumber = storedOrder.orderNumber;
+      this.currentOrderItems = storedOrder.items || [];
+    } else {
+      this.currentOrderNumber = parseInt(localStorage.getItem('lastOrderNumber') || '0') + 1;
+      this.currentOrderItems = [];
+    }
+    console.log('Current order loaded:', { number: this.currentOrderNumber, items: this.currentOrderItems });
   }
 
   async loadProducts() {
@@ -57,13 +75,18 @@ export class MainPage implements OnInit {
       const products = await this.getAllProducts();
       console.log('Productos obtenidos de la base de datos:', products);
   
-      this.products = products.map(product => ({
+      const extendedProducts = products.map(product => ({
         ...product,
         imageURL: product.imageURL ? `assets/${product.imageURL}` : 'assets/default-product-image.jpg',
         showOptions: false,
         selectedSize: 'medium',
         selectedMilk: 'regular'
       }));
+  
+      // Eliminar duplicados
+      this.products = Array.from(new Set(extendedProducts.map(p => p.id)))
+        .map(id => extendedProducts.find(p => p.id === id))
+        .filter((p): p is ExtendedProduct => p !== undefined);
   
       console.log('Productos procesados con URLs de imagen actualizadas:', this.products);
     } catch (error) {
@@ -140,7 +163,7 @@ export class MainPage implements OnInit {
         ...product,
         quantity: 1,
         finalPrice: this.calculatePrice(product),
-        image: product.imageURL  // Añadimos la URL de la imagen aquí
+        image: product.imageURL
       });
     }
   
@@ -148,6 +171,7 @@ export class MainPage implements OnInit {
   
     await this.presentToast(`${product.name} (${product.selectedSize}, ${product.selectedMilk}) añadido a la orden #${this.currentOrderNumber}`);
     this.updateLocalStorage();
+    console.log('Item added to cart:', this.currentOrderItems);
   }
 
   updateLocalStorage() {
@@ -155,6 +179,7 @@ export class MainPage implements OnInit {
       orderNumber: this.currentOrderNumber,
       items: this.currentOrderItems
     }));
+    console.log('Local storage updated:', { number: this.currentOrderNumber, items: this.currentOrderItems });
   }
 
   async completeOrder() {
@@ -163,8 +188,24 @@ export class MainPage implements OnInit {
       return;
     }
 
+  // Guardar el número de orden actual antes de navegar
+  const currentOrderNumber = this.currentOrderNumber;
+
+  
+  
     this.updateLocalStorage();
     this.router.navigate(['/carro-compras']);
+    
+    // Resetear el carrito después de navegar
+    this.currentOrderItems = [];
+    this.currentOrderNumber++;
+    this.updateLocalStorage();
+
+    setTimeout(() => {
+      this.currentOrderItems = [];
+      this.currentOrderNumber = currentOrderNumber + 1;
+      this.updateLocalStorage();
+    }, 100);
   }
 
   async presentToast(message: string) {
@@ -175,6 +216,7 @@ export class MainPage implements OnInit {
     });
     toast.present();
   }
+  
 
   // Método para manejar la actualización de cantidad directamente en la página principal
   updateQuantity(product: ExtendedProduct, change: number) {
@@ -207,6 +249,20 @@ export class MainPage implements OnInit {
   handleImageError(event: any) {
     event.target.src = 'assets/default-product-image.jpg';
   }
+
+  resetOrderNumber() {
+    const today = new Date().toISOString().split('T')[0];
+    const lastResetDate = localStorage.getItem('lastResetDate');
+    
+    if (lastResetDate !== today) {
+      localStorage.setItem('lastOrderNumber', '0');
+      localStorage.setItem('lastResetDate', today);
+    }
+    
+    const lastOrderNumber = parseInt(localStorage.getItem('lastOrderNumber') || '0');
+    this.currentOrderNumber = lastOrderNumber + 1;
+  }
+  
 
 }
 

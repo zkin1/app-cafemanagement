@@ -263,7 +263,9 @@ export class DatabaseService {
         for (let i = 0; i < data.rows.length; i++) {
           orders.push({
             ...data.rows.item(i),
-            status: data.rows.item(i).Status 
+            id: data.rows.item(i).OrderID,
+            status: data.rows.item(i).Status,
+            tableNumber: data.rows.item(i).TableNumber
           });
         }
         return orders;
@@ -545,6 +547,29 @@ export class DatabaseService {
         return of(false);
       })
     );
+  }
+
+  getOrderCountForToday(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const today = new Date().toISOString().split('T')[0];
+      const query = `SELECT COUNT(*) as count FROM Orders WHERE DATE(CreatedAt) = ?`;
+      this.database.executeSql(query, [today]).then(data => {
+        resolve(data.rows.item(0).count);
+      }, err => {
+        reject(err);
+      });
+    });
+  }
+
+  getActiveEmployeesCount(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const query = `SELECT COUNT(*) as count FROM Users WHERE Role = 'employee' AND LastLogin IS NOT NULL`;
+      this.database.executeSql(query, []).then(data => {
+        resolve(data.rows.item(0).count);
+      }, err => {
+        reject(err);
+      });
+    });
   }
 
   

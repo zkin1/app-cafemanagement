@@ -20,7 +20,8 @@
       <ion-row *ngIf="products && products.length > 0; else noProducts">
         <ion-col size="12" size-md="6" size-lg="4" *ngFor="let product of products; let i = index">
           <ion-card class="product-card">
-            <img [src]="product.imageURL" [alt]="product.name || 'Imagen del producto'" (error)="handleImageError($event)"/>
+            <img [src]="product.imageURL" [alt]="product.name || 'Imagen del producto'"
+              (error)="handleImageError($event)" />
             <ion-card-header>
               <ion-card-title>{{ product.name || 'Producto sin nombre' }}</ion-card-title>
             </ion-card-header>
@@ -34,15 +35,13 @@
               </ion-button>
             </ion-card-content>
           </ion-card>
-          
+
           <ion-card *ngIf="product.showOptions" class="options-card" [@slideInOut]>
             <ion-card-content>
               <ion-item>
                 <ion-label position="stacked">Tamaño</ion-label>
-                <ion-select [(ngModel)]="product.selectedSize" 
-                            (ionChange)="updatePrice(product)" 
-                            interface="popover"
-                            placeholder="Seleccione un tamaño">
+                <ion-select [(ngModel)]="product.selectedSize" (ionChange)="updatePrice(product)" interface="popover"
+                  placeholder="Seleccione un tamaño">
                   <ion-select-option value="pequeño">Pequeño (-$1.000)</ion-select-option>
                   <ion-select-option value="medium">Mediano</ion-select-option>
                   <ion-select-option value="grande">Grande (+$1.000)</ion-select-option>
@@ -50,9 +49,8 @@
               </ion-item>
               <ion-item>
                 <ion-label position="stacked">Tipo de leche</ion-label>
-                <ion-select [(ngModel)]="product.selectedMilk" 
-                            interface="popover"
-                            placeholder="Seleccione un tipo de leche">
+                <ion-select [(ngModel)]="product.selectedMilk" interface="popover"
+                  placeholder="Seleccione un tipo de leche">
                   <ion-select-option value="regular">Regular</ion-select-option>
                   <ion-select-option value="descremada">Descremada</ion-select-option>
                   <ion-select-option value="soya">Soya</ion-select-option>
@@ -83,17 +81,12 @@
 <ion-footer>
   <ion-toolbar>
     <ion-button expand="block" 
-                routerLink="/carro-compras" 
-                [disabled]="!currentOrderItems || currentOrderItems.length === 0">
-      Completar Orden ({{ currentOrderItems?.length || 0 }} items)
-    </ion-button>
+    routerLink="/carro-compras" 
+    [disabled]="currentOrderItems.length === 0">
+Completar Orden ({{ currentOrderItems.length }} items)
+</ion-button>
   </ion-toolbar>
 </ion-footer>
 
-<ion-toast
-  [isOpen]="showToast"
-  [message]="toastMessage"
-  [duration]="3000"
-  position="top"
-  color="primary">
+<ion-toast [isOpen]="showToast" [message]="toastMessage" [duration]="3000" position="top" color="primary">
 </ion-toast>

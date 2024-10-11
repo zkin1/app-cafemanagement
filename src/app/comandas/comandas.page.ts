@@ -41,12 +41,21 @@ export class ComandasPage implements OnInit, OnDestroy {
     await loading.present();
   
     try {
-      const ordenes = await this.getOrdersByStatus(['Solicitado', 'En proceso', 'Listo']);
+      const ordenes = await firstValueFrom(this.databaseService.getOrdersByStatus(['Solicitado', 'En proceso', 'Listo']));
+      console.log('Órdenes obtenidas:', ordenes);
+      
       this.ordenes = await Promise.all(ordenes.map(async (orden) => {
-        const detalles = await this.getOrderDetails(orden.id!);
-        return { ...orden, items: detalles };
+        const detalles = await firstValueFrom(this.databaseService.getOrderDetails(orden.id!));
+        console.log(`Detalles de la orden ${orden.id}:`, detalles);
+        return { 
+          ...orden, 
+          items: detalles,
+          id: orden.id ?? 0,  // Aseguramos que id sea number
+          tableNumber: orden.tableNumber ?? 0  // Aseguramos que tableNumber sea number
+        };
       }));
-      console.log('Órdenes cargadas:', this.ordenes);  // Para depuración
+      
+      console.log('Órdenes procesadas:', this.ordenes);
     } catch (error) {
       console.error('Error al cargar órdenes:', error);
       this.presentToast('Error al cargar órdenes. Por favor, intente de nuevo.');
@@ -55,6 +64,7 @@ export class ComandasPage implements OnInit, OnDestroy {
     }
   }
 
+  
   private getOrdersByStatus(statuses: string[]): Promise<Order[]> {
     const result = this.databaseService.getOrdersByStatus(statuses);
     if (result instanceof Observable) {
@@ -107,12 +117,12 @@ export class ComandasPage implements OnInit, OnDestroy {
       this.presentToast('Error: ID de orden no válido');
       return;
     }
-  
+
     try {
       await this.updateOrderStatus(orden.id, nuevoEstado);
       orden.status = nuevoEstado;
       this.presentToast(`Orden #${orden.id} actualizada a ${nuevoEstado}`);
-  
+
       if (nuevoEstado === 'Entregado' || nuevoEstado === 'Cancelado') {
         await this.cargarOrdenes();
       }
