@@ -1,9 +1,20 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
 import { DatabaseService } from '../services/database.service';
-import { ToastController, LoadingController } from '@ionic/angular';
+import { ToastController, LoadingController, Platform } from '@ionic/angular';
 import * as pdfMake from 'pdfmake/build/pdfmake';
 import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 import { TDocumentDefinitions } from 'pdfmake/interfaces';
+import { Chart, ChartConfiguration } from 'chart.js/auto';
+import { Subscription } from 'rxjs';
+import { Capacitor, Plugins } from '@capacitor/core';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+
+const { Permissions } = Plugins;
+
+const { Share } = Plugins;
+
+// Configuración de pdfMake
+(pdfMake as any).vfs = pdfFonts.pdfMake.vfs;
 
 interface DailySale {
   day: string;
@@ -20,19 +31,36 @@ interface TopProduct {
   templateUrl: './admin.page.html',
   styleUrls: ['./admin.page.scss'],
 })
-export class AdminPage implements OnInit {
+export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
+  @ViewChild('dailySalesChart') private chartRef!: ElementRef;
+  private chart: Chart | undefined;
   totalSales: number = 0;
   topProducts: TopProduct[] = [];
   dailySales: DailySale[] = [];
+  private subscriptions: Subscription = new Subscription();
 
   constructor(
     private databaseService: DatabaseService,
     private toastController: ToastController,
-    private loadingController: LoadingController
-  ) { }
+    private loadingController: LoadingController,
+    private platform: Platform
+  ) {}
 
-  async ngOnInit() {
-    await this.loadStatistics();
+  ngOnInit() {
+    this.loadStatistics();
+  }
+
+  ngAfterViewInit() {
+    if (this.dailySales.length > 0) {
+      this.createChart();
+    }
+  }
+
+  ngOnDestroy() {
+    this.subscriptions.unsubscribe();
+    if (this.chart) {
+      this.chart.destroy();
+    }
   }
 
   async loadStatistics() {
@@ -40,37 +68,89 @@ export class AdminPage implements OnInit {
       message: 'Cargando estadísticas...',
     });
     await loading.present();
-  
+
     try {
-      // Obtener ventas totales de la última semana
       const endDate = new Date();
       const startDate = new Date(endDate);
       startDate.setDate(startDate.getDate() - 7); // Últimos 7 días
-  
-      this.totalSales = await this.databaseService.calculateTotalSales(
-        startDate.toISOString().split('T')[0],
-        endDate.toISOString().split('T')[0]
-      );
-  
-      // Obtener productos más vendidos
-      const topSellingProducts = await this.databaseService.getTopSellingProducts(5);
+
+      const [totalSales, topSellingProducts, dailySales] = await Promise.all([
+        this.databaseService.calculateTotalSales(
+          startDate.toISOString().split('T')[0],
+          endDate.toISOString().split('T')[0]
+        ),
+        this.databaseService.getTopSellingProducts(5),
+        this.getDailySales(startDate, endDate)
+      ]);
+
+      this.totalSales = totalSales;
       this.topProducts = topSellingProducts.map(p => ({
         name: p.name,
         sales: p.totalSold
       }));
-  
-      // Obtener ventas por día de la última semana
-      this.dailySales = await this.getDailySales(startDate, endDate);
-  
+      this.dailySales = dailySales;
+
+      this.createChart();
     } catch (error) {
       console.error('Error al cargar estadísticas:', error);
       this.presentToast('Error al cargar estadísticas. Por favor, intente de nuevo.');
     } finally {
-      loading.dismiss();
+      await loading.dismiss();
     }
   }
 
-  async getDailySales(startDate: Date, endDate: Date): Promise<DailySale[]> {
+  private createChart() {
+    if (this.chart) {
+      this.chart.destroy();
+    }
+
+    if (!this.chartRef) {
+      console.error('Chart reference not found');
+      return;
+    }
+
+    const ctx = this.chartRef.nativeElement.getContext('2d');
+    if (!ctx) {
+      console.error('Unable to get 2D context for canvas');
+      return;
+    }
+
+    const chartConfig: ChartConfiguration = {
+      type: 'line',
+      data: {
+        labels: this.dailySales.map(sale => sale.day),
+        datasets: [{
+          label: 'Ventas Diarias',
+          data: this.dailySales.map(sale => sale.amount),
+          fill: false,
+          borderColor: 'rgb(75, 192, 192)',
+          tension: 0.1
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: 'Ventas (CLP)'
+            }
+          },
+          x: {
+            title: {
+              display: true,
+              text: 'Día de la semana'
+            }
+          }
+        }
+      }
+    };
+
+    this.chart = new Chart(ctx, chartConfig);
+  }
+
+  private async getDailySales(startDate: Date, endDate: Date): Promise<DailySale[]> {
     const dailySales: DailySale[] = [];
     const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     let currentDate = new Date(startDate);
@@ -92,45 +172,59 @@ export class AdminPage implements OnInit {
     return dailySales;
   }
 
-  async presentToast(message: string) {
+  private async presentToast(message: string) {
     const toast = await this.toastController.create({
       message: message,
       duration: 2000,
-      position: 'top'
+      position: 'bottom'
     });
-    toast.present();
+    await toast.present();
   }
 
+  async checkStoragePermission(): Promise<boolean> {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        return true;
+      } catch (error) {
+        console.error('Error checking permissions:', error);
+        return false;
+      }
+    }
+    return true; // Siempre retorna true para navegadores web
+  }
   async generateReport() {
+    if (Capacitor.isNativePlatform()) {
+      const hasPermission = await this.requestStoragePermission();
+      if (!hasPermission) {
+        await this.presentToast('Se necesitan permisos de almacenamiento para guardar el informe.');
+        return;
+      }
+    }
+  
     const loading = await this.loadingController.create({
       message: 'Generando informe...',
     });
     await loading.present();
   
     try {
-      // Obtener datos para el informe
       const endDate = new Date();
-      const startDate = new Date();
+      const startDate = new Date(endDate);
       startDate.setDate(startDate.getDate() - 30); // Últimos 30 días
   
-      const totalSales = await this.databaseService.calculateTotalSales(
-        startDate.toISOString().split('T')[0],
-        endDate.toISOString().split('T')[0]
-      );
+      const [totalSales, topSellingProducts, dailySales] = await Promise.all([
+        this.databaseService.calculateTotalSales(
+          startDate.toISOString().split('T')[0],
+          endDate.toISOString().split('T')[0]
+        ),
+        this.databaseService.getTopSellingProducts(5),
+        this.getDailySales(startDate, endDate)
+      ]);
   
-      const topSellingProducts = await this.databaseService.getTopSellingProducts(5);
-  
-      const dailySales = await this.getDailySales(startDate, endDate);
-  
-      // Configurar pdfMake
-
-  
-      // Crear el contenido del PDF
-      const documentDefinition: any = {
+      const documentDefinition: TDocumentDefinitions = {
         content: [
           { text: 'Informe de Ventas', style: 'header' },
           { text: `Período: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`, style: 'subheader' },
-          { text: `Ventas Totales: $${totalSales.toFixed(2)}`, style: 'subheader' },
+          { text: `Ventas Totales: $${totalSales.toLocaleString('es-CL')}`, style: 'subheader' },
           { text: 'Productos Más Vendidos', style: 'subheader' },
           {
             ul: topSellingProducts.map(product => `${product.name}: ${product.totalSold} unidades`)
@@ -142,7 +236,7 @@ export class AdminPage implements OnInit {
               widths: ['*', '*'],
               body: [
                 ['Día', 'Ventas'],
-                ...dailySales.map(sale => [sale.day, `$${sale.amount.toFixed(2)}`])
+                ...dailySales.map(sale => [sale.day, `$${sale.amount.toLocaleString('es-CL')}`])
               ]
             }
           }
@@ -161,26 +255,64 @@ export class AdminPage implements OnInit {
         }
       };
   
-      // Generar el PDF
       const pdfDocGenerator = pdfMake.createPdf(documentDefinition);
-    
-      pdfDocGenerator.getBlob((blob: Blob) => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'informe_ventas.pdf';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      });
   
-      this.presentToast('Informe generado y descargado con éxito');
+      if (Capacitor.isNativePlatform()) {
+        pdfDocGenerator.getBase64(async (base64) => {
+          const fileName = `informe_ventas_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}.pdf`;
+          
+          try {
+            const result = await Filesystem.writeFile({
+              path: `Download/${fileName}`,
+              data: base64,
+              directory: Directory.ExternalStorage,
+              encoding: Encoding.UTF8
+            });
+  
+            console.log('Archivo guardado en:', result.uri);
+            await this.presentToast(`Informe generado y guardado en Descargas/${fileName}`);
+          } catch (error: unknown) {
+            console.error('Error al guardar el archivo:', error);
+            if (error instanceof Error) {
+              if (error.message.includes('Permission denied')) {
+                await this.presentToast('No se tienen permisos para guardar el archivo. Por favor, verifique los permisos de la aplicación.');
+              } else {
+                await this.presentToast('Error al guardar el informe: ' + error.message);
+              }
+            } else {
+              await this.presentToast('Error desconocido al guardar el informe');
+            }
+          }
+        });
+      } else {
+        // Para navegadores web
+        pdfDocGenerator.download(`informe_ventas_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}.pdf`);
+        await this.presentToast('Informe generado y descargado con éxito');
+      }
     } catch (error) {
       console.error('Error al generar el informe:', error);
-      this.presentToast('Error al generar el informe. Por favor, intente de nuevo.');
+      await this.presentToast('Error al generar el informe. Por favor, intente de nuevo.');
     } finally {
-      loading.dismiss();
+      await loading.dismiss();
     }
   }
+
+
+  async requestStoragePermission() {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const permissionStatus = await Permissions['query']({ name: 'storage' });
+        if (permissionStatus.state !== 'granted') {
+          const requestResult = await Permissions['request']({ name: 'storage' });
+          return requestResult.state === 'granted';
+        }
+        return true;
+      } catch (error) {
+        console.error('Error requesting permissions:', error);
+        return false;
+      }
+    }
+    return true;
+  }
+
 }

@@ -1,9 +1,11 @@
-import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Router, NavigationEnd } from '@angular/router';
 import { DatabaseService } from '../services/database.service';
 import { ToastController, LoadingController } from '@ionic/angular';
 import { Product } from '../models/product.model';
 import { trigger, state, style, animate, transition } from '@angular/animations';
+import { Subscription } from 'rxjs';
+import { filter } from 'rxjs/operators';
 
 interface ExtendedProduct extends Product {
   showOptions: boolean;
@@ -28,7 +30,7 @@ interface ExtendedProduct extends Product {
     ])
   ]
 })
-export class MainPage implements OnInit {
+export class MainPage implements OnInit, OnDestroy {
   products: ExtendedProduct[] = [];
   currentOrderNumber: number = 1;
   currentOrderItems: any[] = [];
@@ -36,22 +38,43 @@ export class MainPage implements OnInit {
   showToast: boolean = false;
   toastMessage: string = '';
 
+
+  private navigationSubscription: Subscription = new Subscription();
+  
+  
+
   constructor(
     private router: Router,
     private databaseService: DatabaseService,
     private toastController: ToastController,
+    
     private loadingController: LoadingController
+    
   ) {
     const lastOrderNumber = parseInt(localStorage.getItem('lastOrderNumber') || '0');
     this.currentOrderNumber = lastOrderNumber + 1;
+    this.navigationSubscription = new Subscription();
+    this.loadCurrentOrderNumber();
   }
 
   ngOnInit() {
     this.loadProducts();
-    this.resetOrderNumber();
     this.loadCurrentOrder();
-  }
 
+    // Suscribirse a los eventos de navegación
+    this.navigationSubscription.add(
+      this.router.events.pipe(
+        filter((event): event is NavigationEnd => event instanceof NavigationEnd)
+      ).subscribe(() => {
+        this.loadCurrentOrder();
+      })
+    );
+  }
+  ngOnDestroy() {
+    if (this.navigationSubscription) {
+      this.navigationSubscription.unsubscribe();
+    }
+  }
 
   loadCurrentOrder() {
     const storedOrder = JSON.parse(localStorage.getItem('currentOrder') || 'null');
@@ -59,11 +82,19 @@ export class MainPage implements OnInit {
       this.currentOrderNumber = storedOrder.orderNumber;
       this.currentOrderItems = storedOrder.items || [];
     } else {
-      this.currentOrderNumber = parseInt(localStorage.getItem('lastOrderNumber') || '0') + 1;
+      this.loadCurrentOrderNumber();
       this.currentOrderItems = [];
     }
     console.log('Current order loaded:', { number: this.currentOrderNumber, items: this.currentOrderItems });
   }
+
+  resetCart() {
+    const lastOrderNumber = parseInt(localStorage.getItem('lastOrderNumber') || '0');
+    this.currentOrderNumber = lastOrderNumber + 1;
+    this.currentOrderItems = [];
+    this.updateLocalStorage();
+  }
+
 
   async loadProducts() {
     const loading = await this.loadingController.create({
@@ -75,20 +106,15 @@ export class MainPage implements OnInit {
       const products = await this.getAllProducts();
       console.log('Productos obtenidos de la base de datos:', products);
   
-      const extendedProducts = products.map(product => ({
+      this.products = products.map(product => ({
         ...product,
-        imageURL: product.imageURL ? `assets/${product.imageURL}` : 'assets/default-product-image.jpg',
+        imageURL: product.imageURL.startsWith('assets/') ? product.imageURL : `assets/${product.imageURL}`,
         showOptions: false,
         selectedSize: 'medium',
         selectedMilk: 'regular'
       }));
   
-      // Eliminar duplicados
-      this.products = Array.from(new Set(extendedProducts.map(p => p.id)))
-        .map(id => extendedProducts.find(p => p.id === id))
-        .filter((p): p is ExtendedProduct => p !== undefined);
-  
-      console.log('Productos procesados con URLs de imagen actualizadas:', this.products);
+      console.log('Productos procesados:', this.products);
     } catch (error) {
       console.error('Error al cargar los productos:', error);
       this.presentToast('Error al cargar los productos. Por favor, intente de nuevo.');
@@ -179,6 +205,7 @@ export class MainPage implements OnInit {
       orderNumber: this.currentOrderNumber,
       items: this.currentOrderItems
     }));
+    localStorage.setItem('lastOrderNumber', this.currentOrderNumber.toString());
     console.log('Local storage updated:', { number: this.currentOrderNumber, items: this.currentOrderItems });
   }
 
@@ -191,7 +218,6 @@ export class MainPage implements OnInit {
   // Guardar el número de orden actual antes de navegar
   const currentOrderNumber = this.currentOrderNumber;
 
-  
   
     this.updateLocalStorage();
     this.router.navigate(['/carro-compras']);
@@ -217,6 +243,11 @@ export class MainPage implements OnInit {
     toast.present();
   }
   
+  loadCurrentOrderNumber() {
+    const lastOrderNumber = parseInt(localStorage.getItem('lastOrderNumber') || '0');
+    this.currentOrderNumber = lastOrderNumber + 1;
+    localStorage.setItem('lastOrderNumber', this.currentOrderNumber.toString());
+  }
 
   // Método para manejar la actualización de cantidad directamente en la página principal
   updateQuantity(product: ExtendedProduct, change: number) {
@@ -249,20 +280,6 @@ export class MainPage implements OnInit {
   handleImageError(event: any) {
     event.target.src = 'assets/default-product-image.jpg';
   }
-
-  resetOrderNumber() {
-    const today = new Date().toISOString().split('T')[0];
-    const lastResetDate = localStorage.getItem('lastResetDate');
-    
-    if (lastResetDate !== today) {
-      localStorage.setItem('lastOrderNumber', '0');
-      localStorage.setItem('lastResetDate', today);
-    }
-    
-    const lastOrderNumber = parseInt(localStorage.getItem('lastOrderNumber') || '0');
-    this.currentOrderNumber = lastOrderNumber + 1;
-  }
-  
 
 }
 

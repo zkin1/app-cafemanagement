@@ -1,0 +1,46 @@
+<!-- orden-card.component.html -->
+<ion-card class="orden-card">
+  <ion-card-header>
+    <ion-card-title>Orden #{{ orden.id || 'N/A' }} - Mesa {{ orden.tableNumber || 'N/A' }}</ion-card-title>
+    <ion-card-subtitle>
+      <ion-badge [color]="orden.status === 'Solicitado' ? 'warning' : 
+                          orden.status === 'En proceso' ? 'primary' : 
+                          orden.status === 'Listo' ? 'success' : 'danger'">
+        {{ orden.status || 'Desconocido' }}
+      </ion-badge>
+    </ion-card-subtitle>
+  </ion-card-header>
+
+  <ion-card-content>
+    <div class="items-list">
+      <p *ngFor="let item of orden.items">
+        {{ item.name || 'Producto desconocido' }} x{{ item.quantity || 0 }}
+        <span *ngIf="item.size || item.milkType" class="item-details">
+          ({{ item.size || 'Tamaño estándar' }}
+          <ng-container *ngIf="item.milkType">, leche {{ item.milkType }}</ng-container>)
+        </span>
+        <ion-note slot="end">{{ (item.price * item.quantity) | currency:'CLP':'symbol-narrow':'1.0-0' }}</ion-note>
+      </p>
+    </div>
+    <p class="total-amount">
+      <strong>Total:</strong> 
+      <ion-note slot="end" color="primary">{{ getOrderTotal() | currency:'CLP':'symbol-narrow':'1.0-0' }}</ion-note>
+    </p>
+    <p *ngIf="orden.notes" class="notes">
+      <ion-icon name="create-outline"></ion-icon>
+      <strong>Notas:</strong> {{ orden.notes }}
+    </p>
+  </ion-card-content>
+
+  <div class="action-buttons">
+    <ion-button [disabled]="orden.status !== 'Solicitado'" (click)="onCambiarEstado('En proceso')" color="primary">
+      En Proceso
+    </ion-button>
+    <ion-button [disabled]="orden.status !== 'En proceso'" (click)="onCambiarEstado('Listo')" color="success">
+      Lista
+    </ion-button>
+    <ion-button [disabled]="orden.status === 'Listo' || orden.status === 'Cancelado'" (click)="onCambiarEstado('Cancelado')" color="danger">
+      Cancelar
+    </ion-button>
+  </div>
+</ion-card>

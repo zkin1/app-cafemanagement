@@ -2,8 +2,9 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { DatabaseService } from '../services/database.service';
 import { Product } from '../models/product.model';
 import { ToastController, LoadingController } from '@ionic/angular';
-import { Subscription, Observable, from, of} from 'rxjs';
+import { Subscription, Observable, from, of, lastValueFrom} from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
+
 
 @Component({
   selector: 'app-crud',
@@ -41,26 +42,44 @@ export class CrudPage implements OnInit, OnDestroy {
       message: 'Cargando productos...',
     });
     await loading.present();
-
+  
     try {
-      this.products = await this.getAllProducts();
+      const products = await lastValueFrom(this.getAllProducts());
+      console.log('Productos obtenidos de la base de datos:', products);
+  
+      // Mapeamos los productos para asegurarnos de que tienen la estructura correcta
+      this.products = products.map(product => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        category: product.category,
+        imageURL: product.imageURL.startsWith('assets/') ? product.imageURL : `assets/${product.imageURL}`,
+        isAvailable: product.isAvailable
+      }));
+  
+      console.log('Productos procesados para CRUD:', this.products);
     } catch (error) {
-      console.error('Error loading products:', error);
-      this.presentToast('Error al cargar los productos');
+      console.error('Error al cargar los productos:', error);
+      await this.presentToast('Error al cargar los productos. Por favor, intente de nuevo.');
     } finally {
       await loading.dismiss();
     }
   }
 
-  private getAllProducts(): Promise<Product[]> {
-    const result = this.databaseService.getAllProducts();
-    if (result instanceof Observable) {
-      return result.pipe(
-        map(products => products || []),
-        catchError(() => of([]))
-      ).toPromise().then(value => value ?? []);
-    }
-    return Promise.resolve(result || []);
+  private getAllProducts(): Observable<Product[]> {
+    return this.databaseService.getAllProducts().pipe(
+      map(products => {
+        // Asegúrate de que cada producto tenga un ID único
+        return products.filter((product, index, self) =>
+          index === self.findIndex((t) => t.id === product.id)
+        );
+      }),
+      catchError(error => {
+        console.error('Error al obtener productos:', error);
+        return of([]);
+      })
+    );
   }
   
   async addProduct() {
@@ -191,4 +210,11 @@ export class CrudPage implements OnInit, OnDestroy {
       this.resetForm();
     }
   }
+
+
+  handleImageError(event: any) {
+    event.target.src = 'assets/default-product-image.jpg';
+  }
+
+
 }

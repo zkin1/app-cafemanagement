@@ -14,6 +14,11 @@ import { firstValueFrom } from 'rxjs';
 })
 export class ComandasPage implements OnInit, OnDestroy {
 
+  ordenesSolicitadas: Order[] = [];
+  ordenesEnProceso: Order[] = [];
+  ordenesListas: Order[] = [];
+  ordenesCanceladas: Order[] = [];
+
   showToast: boolean = false;
   toastMessage: string = '';
   
@@ -41,21 +46,30 @@ export class ComandasPage implements OnInit, OnDestroy {
     await loading.present();
   
     try {
-      const ordenes = await firstValueFrom(this.databaseService.getOrdersByStatus(['Solicitado', 'En proceso', 'Listo']));
+      const ordenes = await firstValueFrom(this.databaseService.getOrdersByStatus(['Solicitado', 'En proceso', 'Listo', 'Cancelado']));
       console.log('Órdenes obtenidas:', ordenes);
       
-      this.ordenes = await Promise.all(ordenes.map(async (orden) => {
+      const ordenesConDetalles = await Promise.all(ordenes.map(async (orden) => {
         const detalles = await firstValueFrom(this.databaseService.getOrderDetails(orden.id!));
-        console.log(`Detalles de la orden ${orden.id}:`, detalles);
         return { 
           ...orden, 
           items: detalles,
-          id: orden.id ?? 0,  // Aseguramos que id sea number
-          tableNumber: orden.tableNumber ?? 0  // Aseguramos que tableNumber sea number
+          id: orden.id ?? 0,
+          tableNumber: orden.tableNumber ?? 0
         };
       }));
       
-      console.log('Órdenes procesadas:', this.ordenes);
+      this.ordenesSolicitadas = ordenesConDetalles.filter(orden => orden.status === 'Solicitado');
+      this.ordenesEnProceso = ordenesConDetalles.filter(orden => orden.status === 'En proceso');
+      this.ordenesListas = ordenesConDetalles.filter(orden => orden.status === 'Listo');
+      this.ordenesCanceladas = ordenesConDetalles.filter(orden => orden.status === 'Cancelado');
+      
+      console.log('Órdenes procesadas:', {
+        solicitadas: this.ordenesSolicitadas,
+        enProceso: this.ordenesEnProceso,
+        listas: this.ordenesListas,
+        canceladas: this.ordenesCanceladas
+      });
     } catch (error) {
       console.error('Error al cargar órdenes:', error);
       this.presentToast('Error al cargar órdenes. Por favor, intente de nuevo.');
@@ -123,12 +137,35 @@ export class ComandasPage implements OnInit, OnDestroy {
       orden.status = nuevoEstado;
       this.presentToast(`Orden #${orden.id} actualizada a ${nuevoEstado}`);
 
-      if (nuevoEstado === 'Entregado' || nuevoEstado === 'Cancelado') {
-        await this.cargarOrdenes();
-      }
+      this.moverOrden(orden);
+
     } catch (error) {
       console.error('Error al actualizar estado de la orden:', error);
       this.presentToast('Error al actualizar el estado. Por favor, intente de nuevo.');
+    }
+  }
+
+  private moverOrden(orden: Order) {
+    // Remover la orden de su lista actual
+    this.ordenesSolicitadas = this.ordenesSolicitadas.filter(o => o.id !== orden.id);
+    this.ordenesEnProceso = this.ordenesEnProceso.filter(o => o.id !== orden.id);
+    this.ordenesListas = this.ordenesListas.filter(o => o.id !== orden.id);
+    this.ordenesCanceladas = this.ordenesCanceladas.filter(o => o.id !== orden.id);
+
+    // Añadir la orden a su nueva lista
+    switch (orden.status) {
+      case 'Solicitado':
+        this.ordenesSolicitadas.push(orden);
+        break;
+      case 'En proceso':
+        this.ordenesEnProceso.push(orden);
+        break;
+      case 'Listo':
+        this.ordenesListas.push(orden);
+        break;
+      case 'Cancelado':
+        this.ordenesCanceladas.push(orden);
+        break;
     }
   }
 
@@ -154,4 +191,26 @@ export class ComandasPage implements OnInit, OnDestroy {
   getOrderTotal(orden: Order): number {
     return orden.items?.reduce((total, item) => total + ((item.price || 0) * (item.quantity || 0)), 0) || 0;
   }
+
+  currentSegment: string = 'solicitadas';
+
+  segmentChanged(event: any) {
+    console.log('Segment changed', event);
+    this.currentSegment = event.detail.value;
+  }
+
+  hayOrdenes(): boolean {
+    return this.ordenesSolicitadas.length > 0 || 
+           this.ordenesEnProceso.length > 0 || 
+           this.ordenesListas.length > 0 || 
+           this.ordenesCanceladas.length > 0;
+  }
+
+  totalOrdenes(): number {
+    return this.ordenesSolicitadas.length + 
+           this.ordenesEnProceso.length + 
+           this.ordenesListas.length + 
+           this.ordenesCanceladas.length;
+  }
+
 }

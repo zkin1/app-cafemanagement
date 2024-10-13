@@ -223,10 +223,12 @@ export class DatabaseService {
       map(data => {
         console.log('Resultado de la consulta de productos:', JSON.stringify(data));
         let products: Product[] = [];
+        
         for (let i = 0; i < data.rows.length; i++) {
           let item = data.rows.item(i);
           console.log('Producto individual:', JSON.stringify(item));
-          products.push({
+          
+          const product: Product = {
             id: item.ProductID,
             name: item.Name,
             description: item.Description,
@@ -234,10 +236,11 @@ export class DatabaseService {
             category: item.Category,
             imageURL: item.ImageURL,
             isAvailable: item.IsAvailable === 1
-          });
+          };
+          products.push(product);
         }
+        
         console.log('Productos procesados:', JSON.stringify(products));
-        this.products.next(products);
         return products;
       }),
       catchError(error => {
@@ -359,13 +362,24 @@ export class DatabaseService {
     return from(this.database.executeSql(`
       SELECT od.*, p.Name, p.ImageURL 
       FROM OrderDetails od
-      JOIN Products p ON od.ProductID = p.ProductID
+      LEFT JOIN Products p ON od.ProductID = p.ProductID
       WHERE od.OrderID = ?
     `, [orderId])).pipe(
       map(data => {
         let orderDetails: OrderDetail[] = [];
         for (let i = 0; i < data.rows.length; i++) {
-          orderDetails.push(data.rows.item(i));
+          const item = data.rows.item(i);
+          orderDetails.push({
+            id: item.OrderDetailID,
+            orderId: item.OrderID,
+            productId: item.ProductID,
+            quantity: item.Quantity,
+            size: item.Size,
+            milkType: item.MilkType,
+            price: item.Price,
+            name: item.Name || 'Producto desconocido',
+            image: item.ImageURL || 'assets/default-product-image.jpg'
+          });
         }
         return orderDetails;
       })
@@ -516,8 +530,6 @@ export class DatabaseService {
       { name: 'Café Americano', description: 'Café negro tradicional', price: 2500, category: 'Bebidas calientes', imageURL: 'americano.jpg', isAvailable: true },
       { name: 'Cappuccino', description: 'Espresso con leche espumosa', price: 3000, category: 'Bebidas calientes', imageURL: 'cappuccino.jpg', isAvailable: true },
       { name: 'Latte', description: 'Café con leche cremosa', price: 3200, category: 'Bebidas calientes', imageURL: 'latte.jpg', isAvailable: true },
-      { name: 'Mocha', description: 'Café con chocolate y leche', price: 3500, category: 'Bebidas calientes', imageURL: 'mocha.jpg', isAvailable: true },
-      { name: 'Espresso', description: 'Café concentrado', price: 2000, category: 'Bebidas calientes', imageURL: 'espresso.jpg', isAvailable: true }
     ];
   
     return forkJoin([

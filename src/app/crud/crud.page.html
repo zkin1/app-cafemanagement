@@ -105,7 +105,9 @@
     <ion-list>
       <ion-item *ngFor="let product of products">
         <ion-thumbnail slot="start">
-          <img [src]="product.imageURL" [alt]="product.name">
+          <img [src]="product.imageURL.startsWith('assets/') ? product.imageURL : 'assets/' + product.imageURL" 
+               [alt]="product.name"
+               (error)="handleImageError($event)">
         </ion-thumbnail>
         <ion-label>
           <h2>{{ product.name }}</h2>

@@ -1,42 +1,58 @@
 <ion-content class="ion-padding">
-  <h2>Estadísticas de Ventas (Última Semana)</h2>
+  <h1 class="main-title">Panel de Administración</h1>
+  
+  <h2 class="section-title">Estadísticas de Ventas (Última Semana)</h2>
 
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Ventas Totales</ion-card-title>
-    </ion-card-header>
-    <ion-card-content>
-      <h1>{{ totalSales | currency:'CLP':'symbol-narrow':'1.0-0' }}</h1>
-    </ion-card-content>
-  </ion-card>
+  <ion-grid>
+    <ion-row>
+      <ion-col size="12" size-md="6">
+        <ion-card class="total-sales-card">
+          <ion-card-header>
+            <ion-card-title>Ventas Totales</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <h1 class="total-amount">{{ totalSales | currency:'CLP':'symbol-narrow':'1.0-0' }}</h1>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
 
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Productos Más Vendidos</ion-card-title>
-    </ion-card-header>
-    <ion-card-content>
-      <ion-list>
-        <ion-item *ngFor="let product of topProducts">
-          <ion-label>{{ product.name }}</ion-label>
-          <ion-note slot="end">{{ product.sales }} unidades</ion-note>
-        </ion-item>
-      </ion-list>
-    </ion-card-content>
-  </ion-card>
+      <ion-col size="12" size-md="6">
+        <ion-card class="top-products-card">
+          <ion-card-header>
+            <ion-card-title>Productos Más Vendidos</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-list lines="none">
+              <ion-item *ngFor="let product of topProducts; let i = index">
+                <ion-label>
+                  <h2>{{ i + 1 }}. {{ product.name }}</h2>
+                </ion-label>
+                <ion-badge slot="end" color="primary">{{ product.sales }} unidades</ion-badge>
+              </ion-item>
+            </ion-list>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
 
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Ventas por Día</ion-card-title>
-    </ion-card-header>
-    <ion-card-content>
-      <ion-list>
-        <ion-item *ngFor="let sale of dailySales">
-          <ion-label>{{ sale.day }}</ion-label>
-          <ion-note slot="end">{{ sale.amount | currency:'CLP':'symbol-narrow':'1.0-0' }}</ion-note>
-        </ion-item>
-      </ion-list>
-    </ion-card-content>
-  </ion-card>
+    <ion-row>
+      <ion-col size="12">
+        <ion-card class="daily-sales-card">
+          <ion-card-header>
+            <ion-card-title>Ventas por Día</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="chart-container">
+              <canvas #dailySalesChart></canvas>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
 
-  <ion-button expand="block" (click)="generateReport()">Generar reporte detallado</ion-button>
+  <ion-button expand="block" (click)="generateReport()" class="generate-report-btn">
+    <ion-icon name="document-text-outline" slot="start"></ion-icon>
+    Generar reporte detallado
+  </ion-button>
 </ion-content>

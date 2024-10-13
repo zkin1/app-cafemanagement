@@ -8,6 +8,39 @@
     --ion-color-medium: #92949c;
     --ion-color-light: #f4f5f8;
   }
+  .custom-segment {
+    background: var(--ion-color-light);
+    border-radius: 20px;
+    margin: 10px 0;
+    --background: #ffffff;
+  
+    ion-segment-button {
+      --padding-top: 8px;
+      --padding-bottom: 8px;
+      --background-checked: var(--ion-color-primary);
+      --color-checked: #ffffff;
+      --indicator-color: transparent;
+      min-height: 60px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 20px;
+      margin: 2px;
+      transition: background-color 0.3s, color 0.3s;
+  
+      &::part(indicator-background) {
+        background: var(--ion-color-primary);
+      }
+  
+      ion-icon {
+        font-size: 24px;
+      }
+  
+      &.segment-button-checked {
+        background: var(--ion-color-primary);
+        color: #ffffff;
+      }
+    }
+  }
   
   ion-content {
     --background: var(--ion-color-light);

@@ -64,6 +64,7 @@ export class AppComponent {
           if (isReady) {
             console.log('Database is ready');
             await this.checkAndInsertSeedData();
+            this.checkAuthState(); // Añade esta línea
           }
         },
         error: (error) => {
@@ -128,7 +129,26 @@ get isAdmin(): boolean {
 
   logout() {
     localStorage.removeItem('currentUser');
-    this.router.navigate(['/login']);
+    this.router.navigate(['/login']).then(() => {
+      window.location.reload(); 
+    });
+  }
+
+  checkAuthState() {
+    const user = JSON.parse(localStorage.getItem('currentUser') || 'null');
+    if (user) {
+      // Usuario autenticado
+      console.log('Usuario autenticado:', user);
+      if (this.router.url === '/login') {
+        this.router.navigate(['/main']);
+      }
+    } else {
+      // Usuario no autenticado
+      console.log('Usuario no autenticado');
+      if (this.router.url !== '/login' && this.router.url !== '/register') {
+        this.router.navigate(['/login']);
+      }
+    }
   }
 
   async presentAlert(header: string, message: string) {
