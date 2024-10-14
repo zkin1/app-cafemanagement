@@ -128,11 +128,9 @@ export class MainPage implements OnInit, OnDestroy {
     return new Promise((resolve, reject) => {
       this.databaseService.getAllProducts().subscribe({
         next: (products) => {
-          console.log('Productos recibidos del servicio:', products);
           resolve(products);
         },
         error: (err) => {
-          console.error('Error al obtener productos:', err);
           reject(err);
         }
       });

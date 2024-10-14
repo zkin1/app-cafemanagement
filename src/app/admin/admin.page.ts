@@ -10,7 +10,6 @@ import { Capacitor, Plugins } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 
 const { Permissions } = Plugins;
-
 const { Share } = Plugins;
 
 // Configuración de pdfMake
@@ -19,6 +18,7 @@ const { Share } = Plugins;
 interface DailySale {
   day: string;
   amount: number;
+  canceledAmount: number;
 }
 
 interface TopProduct {
@@ -36,8 +36,11 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
   private chart: Chart | undefined;
   totalSales: number = 0;
   topProducts: TopProduct[] = [];
-  dailySales: DailySale[] = [];
+  dailySales: { day: string; amount: number; canceledAmount: number }[] = [];
   private subscriptions: Subscription = new Subscription();
+
+  ventasRealizadas: number = 0;
+  ventasCanceladas: number = 0;
 
   constructor(
     private databaseService: DatabaseService,
@@ -68,28 +71,45 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
       message: 'Cargando estadísticas...',
     });
     await loading.present();
-
+  
     try {
       const endDate = new Date();
       const startDate = new Date(endDate);
       startDate.setDate(startDate.getDate() - 7); // Últimos 7 días
-
-      const [totalSales, topSellingProducts, dailySales] = await Promise.all([
-        this.databaseService.calculateTotalSales(
+  
+      this.ventasRealizadas = await this.databaseService.calculateTotalSales(
+        startDate.toISOString().split('T')[0],
+        endDate.toISOString().split('T')[0],
+        ['Solicitado', 'En proceso', 'Listo', 'Entregado']
+      );
+  
+      this.ventasCanceladas = await this.databaseService.calculateTotalSales(
+        startDate.toISOString().split('T')[0],
+        endDate.toISOString().split('T')[0],
+        ['Cancelado']
+      );
+  
+      this.ordenesCancel = {
+        cantidad: await this.databaseService.getOrdersCount(['Cancelado']),
+        total: await this.databaseService.calculateTotalSales(
           startDate.toISOString().split('T')[0],
-          endDate.toISOString().split('T')[0]
-        ),
+          endDate.toISOString().split('T')[0],
+          ['Cancelado']
+        )
+      };
+  
+      const [topSellingProducts, dailySales] = await Promise.all([
         this.databaseService.getTopSellingProducts(5),
         this.getDailySales(startDate, endDate)
       ]);
-
-      this.totalSales = totalSales;
+  
+      this.totalSales = this.ventasRealizadas;
       this.topProducts = topSellingProducts.map(p => ({
         name: p.name,
         sales: p.totalSold
       }));
       this.dailySales = dailySales;
-
+  
       this.createChart();
     } catch (error) {
       console.error('Error al cargar estadísticas:', error);
@@ -103,51 +123,113 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
     if (this.chart) {
       this.chart.destroy();
     }
-
     if (!this.chartRef) {
       console.error('Chart reference not found');
       return;
     }
-
+  
     const ctx = this.chartRef.nativeElement.getContext('2d');
     if (!ctx) {
       console.error('Unable to get 2D context for canvas');
       return;
     }
-
-    const chartConfig: ChartConfiguration = {
-      type: 'line',
+  
+    const data = {
+      labels: this.dailySales.map(sale => sale.day),
+      datasets: [
+        {
+          label: 'Ventas Realizadas',
+          data: this.dailySales.map(sale => sale.amount),
+          backgroundColor: 'rgba(75, 192, 192, 0.6)',
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 1
+        },
+        {
+          label: 'Ventas Canceladas',
+          data: this.dailySales.map(sale => sale.canceledAmount),
+          backgroundColor: 'rgba(255, 99, 132, 0.6)',
+          borderColor: 'rgba(255, 99, 132, 1)',
+          borderWidth: 1
+        }
+      ]
+    };
+  
+    const config: ChartConfiguration = {
+      type: 'line', 
       data: {
         labels: this.dailySales.map(sale => sale.day),
-        datasets: [{
-          label: 'Ventas Diarias',
-          data: this.dailySales.map(sale => sale.amount),
-          fill: false,
-          borderColor: 'rgb(75, 192, 192)',
-          tension: 0.1
-        }]
+        datasets: [
+          {
+            label: 'Ventas Realizadas',
+            data: this.dailySales.map(sale => sale.amount),
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            fill: true
+          },
+          {
+            label: 'Ventas Canceladas',
+            data: this.dailySales.map(sale => sale.canceledAmount),
+            borderColor: 'rgba(255, 99, 132, 1)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            fill: true
+          }
+        ]
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              boxWidth: 12,
+              font: {
+                size: 10
+              }
+            }
+          },
+          title: {
+            display: true,
+            text: 'Ventas por Día',
+            font: {
+              size: 14
+            }
+          }
+        },
         scales: {
           y: {
             beginAtZero: true,
             title: {
               display: true,
-              text: 'Ventas (CLP)'
+              text: 'Ventas (CLP)',
+              font: {
+                size: 10
+              }
+            },
+            ticks: {
+              font: {
+                size: 8
+              },
+              callback: function(value) {
+                return '$ ' + value.toLocaleString('es-CL');
+              }
             }
           },
           x: {
             title: {
-              display: true,
-              text: 'Día de la semana'
+              display: false
+            },
+            ticks: {
+              font: {
+                size: 8
+              }
             }
           }
         }
       }
     };
-
-    this.chart = new Chart(ctx, chartConfig);
+  
+    this.chart = new Chart(ctx, config);
   }
 
   private async getDailySales(startDate: Date, endDate: Date): Promise<DailySale[]> {
@@ -156,14 +238,23 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
     let currentDate = new Date(startDate);
     
     while (currentDate <= endDate) {
-      const dayTotal = await this.databaseService.calculateTotalSales(
-        currentDate.toISOString().split('T')[0],
-        currentDate.toISOString().split('T')[0]
-      );
+      const [dayTotal, canceledTotal] = await Promise.all([
+        this.databaseService.calculateTotalSales(
+          currentDate.toISOString().split('T')[0],
+          currentDate.toISOString().split('T')[0],
+          ['Solicitado', 'En proceso', 'Listo', 'Entregado']
+        ),
+        this.databaseService.calculateTotalSales(
+          currentDate.toISOString().split('T')[0],
+          currentDate.toISOString().split('T')[0],
+          ['Cancelado']
+        )
+      ]);
       
       dailySales.push({
         day: daysOfWeek[currentDate.getDay()],
-        amount: dayTotal
+        amount: dayTotal,
+        canceledAmount: canceledTotal
       });
   
       currentDate.setDate(currentDate.getDate() + 1);
@@ -314,5 +405,8 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
     }
     return true;
   }
-
+  ordenesCancel = {
+    cantidad: 0,
+    total: 0
+  };
 }

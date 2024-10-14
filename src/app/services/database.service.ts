@@ -275,7 +275,13 @@ export class DatabaseService {
       })
     );
   }
-
+  
+  async getOrdersCount(statuses: string[]): Promise<number> {
+    const placeholders = statuses.map(() => '?').join(',');
+    const query = `SELECT COUNT(*) as count FROM Orders WHERE Status IN (${placeholders})`;
+    const result = await this.database.executeSql(query, statuses);
+    return result.rows.item(0).count;
+  }
   // Método de autenticación
   async authenticateUser(email: string, password: string): Promise<User | null> {
     console.log('Intentando autenticar usuario:', email);
@@ -315,9 +321,23 @@ export class DatabaseService {
   }
 
   // Método para calcular ventas totales
-  async calculateTotalSales(startDate: string, endDate: string): Promise<number> {
-    const data = await this.database.executeSql('SELECT SUM(TotalAmount) as TotalSales FROM Orders WHERE DATE(CreatedAt) BETWEEN ? AND ?', [startDate, endDate]);
-    return data.rows.item(0).TotalSales || 0;
+  async calculateTotalSales(startDate: string, endDate: string, statuses: string[] = ['Solicitado', 'En proceso', 'Listo', 'Entregado']): Promise<number> {
+    const placeholders = statuses.map(() => '?').join(',');
+    const query = `
+      SELECT SUM(TotalAmount) as TotalSales 
+      FROM Orders 
+      WHERE DATE(CreatedAt) BETWEEN ? AND ? 
+      AND Status IN (${placeholders})
+    `;
+    const params = [startDate, endDate, ...statuses];
+    
+    try {
+      const data = await this.database.executeSql(query, params);
+      return data.rows.item(0).TotalSales || 0;
+    } catch (error) {
+      console.error('Error al calcular ventas totales:', error);
+      return 0;
+    }
   }
 
   // Método para obtener productos más vendidos
