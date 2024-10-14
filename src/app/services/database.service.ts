@@ -30,7 +30,6 @@ export class DatabaseService {
 
   async initializeDatabase() {
     try {
-  
       // Crear una nueva base de datos
       this.database = await this.sqlite.create({
         name: 'cafeteria.db',
@@ -102,16 +101,18 @@ export class DatabaseService {
 
   tableSalesReports: string = `
     CREATE TABLE IF NOT EXISTS SalesReports (
-      ReportID INTEGER PRIMARY KEY AUTOINCREMENT,
-      Date DATE NOT NULL,
-      TotalSales REAL NOT NULL,
-      TotalOrders INTEGER NOT NULL,
-      AverageOrderValue REAL,
-      TopSellingProduct INTEGER,
-      GeneratedBy INTEGER,
-      CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (GeneratedBy) REFERENCES Users(UserID),
-      FOREIGN KEY (TopSellingProduct) REFERENCES Products(ProductID)
+    ReportID INTEGER PRIMARY KEY AUTOINCREMENT,
+    StartDate DATE NOT NULL,
+    EndDate DATE NOT NULL,
+    TotalSales REAL NOT NULL,
+    TotalOrders INTEGER NOT NULL,
+    CanceledOrders INTEGER NOT NULL,
+    CanceledSales REAL NOT NULL,
+    TopSellingProducts TEXT NOT NULL,
+    DailySales TEXT NOT NULL,
+    GeneratedBy INTEGER,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (GeneratedBy) REFERENCES Users(UserID)
     );`;
 
   // BehaviorSubjects para los listados
@@ -604,5 +605,31 @@ export class DatabaseService {
     });
   }
 
+
+  async getProductDetails(productName: string): Promise<any> {
+    const query = `
+      SELECT 
+        p.Name as name,
+        SUM(od.Quantity) as totalSold,
+        SUM(od.Quantity * od.Price) as totalRevenue,
+        p.Stock as currentStock
+      FROM Products p
+      LEFT JOIN OrderDetails od ON p.ProductID = od.ProductID
+      WHERE p.Name = ?
+      GROUP BY p.ProductID
+    `;
+    
+    try {
+      const result = await this.database.executeSql(query, [productName]);
+      if (result.rows.length > 0) {
+        return result.rows.item(0);
+      } else {
+        throw new Error('Producto no encontrado');
+      }
+    } catch (error) {
+      console.error('Error al obtener detalles del producto:', error);
+      throw error;
+    }
+  }
   
 }

@@ -1,6 +1,6 @@
 import { Component, OnInit, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
 import { DatabaseService } from '../services/database.service';
-import { ToastController, LoadingController, Platform } from '@ionic/angular';
+import { ToastController, LoadingController, Platform, AlertController } from '@ionic/angular';
 import * as pdfMake from 'pdfmake/build/pdfmake';
 import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 import { TDocumentDefinitions } from 'pdfmake/interfaces';
@@ -8,6 +8,7 @@ import { Chart, ChartConfiguration } from 'chart.js/auto';
 import { Subscription } from 'rxjs';
 import { Capacitor, Plugins } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { App } from '@capacitor/app';
 
 const { Permissions } = Plugins;
 const { Share } = Plugins;
@@ -46,8 +47,11 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
     private databaseService: DatabaseService,
     private toastController: ToastController,
     private loadingController: LoadingController,
-    private platform: Platform
-  ) {}
+    private platform: Platform,
+    private alertController: AlertController  
+  ) {
+    (pdfMake as any).vfs = pdfFonts.pdfMake.vfs;
+  }
 
   ngOnInit() {
     this.loadStatistics();
@@ -272,23 +276,60 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
     await toast.present();
   }
 
-  async checkStoragePermission(): Promise<boolean> {
-    if (Capacitor.isNativePlatform()) {
-      try {
-        return true;
-      } catch (error) {
-        console.error('Error checking permissions:', error);
-        return false;
+  private async checkAndRequestStoragePermission(): Promise<boolean> {
+    try {
+      const permissionStatus = await Permissions['checkPermissions']({ permissions: ['storage'] });
+      console.log('Estado inicial de permisos:', permissionStatus);
+
+      if (permissionStatus.storage !== 'granted') {
+        console.log('Solicitando permisos de almacenamiento...');
+        const requestResult = await Permissions['requestPermissions']({ permissions: ['storage'] });
+        console.log('Resultado de la solicitud de permisos:', requestResult);
+
+        if (requestResult.storage !== 'granted') {
+          await this.showPermissionDeniedAlert();
+          return false;
+        }
       }
+      return true;
+    } catch (error) {
+      console.error('Error al verificar o solicitar permisos:', error);
+      await this.presentToast('Error al verificar permisos: ' + JSON.stringify(error));
+      return false;
     }
-    return true; // Siempre retorna true para navegadores web
+  }
+
+  private async showPermissionDeniedAlert() {
+    const alert = await this.alertController.create({
+      header: 'Permisos necesarios',
+      message: 'Esta aplicación necesita permisos de almacenamiento para guardar informes. Por favor, habilita los permisos en la configuración de la aplicación.',
+      buttons: ['OK']
+    });
+    await alert.present();
   }
   async generateReport() {
     if (Capacitor.isNativePlatform()) {
-      const hasPermission = await this.requestStoragePermission();
-      if (!hasPermission) {
-        await this.presentToast('Se necesitan permisos de almacenamiento para guardar el informe.');
-        return;
+      try {
+        // Intentamos escribir un archivo de prueba para verificar los permisos
+        await Filesystem.writeFile({
+          path: 'test.txt',
+          data: 'This is a test',
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8
+        });
+  
+        // Si llegamos aquí, tenemos permisos. Eliminamos el archivo de prueba.
+        await Filesystem.deleteFile({
+          path: 'test.txt',
+          directory: Directory.Documents
+        });
+      } catch (error) {
+        console.error('Error al verificar permisos:', error);
+        const alertResult = await this.showPermissionAlert();
+        if (!alertResult) {
+          await this.presentToast('Se necesitan permisos para generar el informe');
+          return;
+        }
       }
     }
   
@@ -362,7 +403,7 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
   
             console.log('Archivo guardado en:', result.uri);
             await this.presentToast(`Informe generado y guardado en Descargas/${fileName}`);
-          } catch (error: unknown) {
+          } catch (error) {
             console.error('Error al guardar el archivo:', error);
             if (error instanceof Error) {
               if (error.message.includes('Permission denied')) {
@@ -387,6 +428,33 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
       await loading.dismiss();
     }
   }
+
+  private async showPermissionAlert(): Promise<boolean> {
+    return new Promise(async (resolve) => {
+      const alert = await this.alertController.create({
+        header: 'Permisos necesarios',
+        message: 'Esta aplicación necesita acceso al almacenamiento para guardar informes. Por favor, habilita los permisos en la configuración de la aplicación.',
+        buttons: [
+          {
+            text: 'Cancelar',
+            role: 'cancel',
+            handler: () => resolve(false)
+          },
+          {
+            text: 'Entendido',
+            handler: () => {
+              this.presentToast('Por favor, abra la configuración de la aplicación y otorgue los permisos necesarios.');
+              resolve(true);
+            }
+          }
+        ]
+      });
+
+      await alert.present();
+    });
+  }
+
+
 
 
   async requestStoragePermission() {

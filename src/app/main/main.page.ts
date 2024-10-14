@@ -193,7 +193,6 @@ export class MainPage implements OnInit, OnDestroy {
   
     product.showOptions = false;
   
-    await this.presentToast(`${product.name} (${product.selectedSize}, ${product.selectedMilk}) añadido a la orden #${this.currentOrderNumber}`);
     this.updateLocalStorage();
     console.log('Item added to cart:', this.currentOrderItems);
   }

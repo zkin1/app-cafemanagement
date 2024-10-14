@@ -2,7 +2,7 @@
   <div class="register-container">
     <h1>Únete a nosotros</h1>
     <h2>Registro</h2>
-    <form (ngSubmit)="onSubmit()">
+    <form (ngSubmit)="onSubmit()" #registerForm="ngForm">
       <ion-item>
         <ion-label position="floating">Nombre</ion-label>
         <ion-input type="text" [(ngModel)]="name" name="name" required></ion-input>
@@ -15,15 +15,26 @@
         <ion-label position="floating">Contraseña</ion-label>
         <ion-input type="password" [(ngModel)]="password" name="password" required></ion-input>
       </ion-item>
-      <ion-button expand="block" type="submit">Registrarse</ion-button>
+      <ion-item>
+        <ion-label position="floating">Confirmar Contraseña</ion-label>
+        <ion-input type="password" [(ngModel)]="confirmPassword" name="confirmPassword" required></ion-input>
+      </ion-item>
+      <ion-text color="danger" *ngIf="password !== confirmPassword && registerForm.submitted">
+        Las contraseñas no coinciden
+      </ion-text>
+
+      <ion-button expand="block" type="submit" [disabled]="password !== confirmPassword">
+        Registrarse
+      </ion-button>
     </form>
     <a [routerLink]="['/login']" class="login-link">¿Ya tienes una cuenta? Inicia sesión</a>
   </div>
 </ion-content>
+
 <ion-toast
-[isOpen]="showToast"
-[message]="toastMessage"
-[duration]="3000"
-position="top"
-color="primary"
-></ion-toast>
+  [isOpen]="showToast"
+  [message]="toastMessage"
+  [duration]="3000"
+  position="top"
+  color="primary">
+</ion-toast>

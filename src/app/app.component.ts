@@ -1,9 +1,12 @@
 import { Component } from '@angular/core';
-import { Platform, AlertController } from '@ionic/angular';
+import { Platform, AlertController, ToastController } from '@ionic/angular';
 import { DatabaseService } from './services/database.service';
 import { addIcons } from 'ionicons';
 import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Router } from '@angular/router';
+import { App } from '@capacitor/app';
+
 
 import { 
   homeOutline, 
@@ -24,11 +27,14 @@ import {
   styleUrls: ['app.component.scss'],
 })
 export class AppComponent {
+  
   constructor(
     private platform: Platform,
     private databaseService: DatabaseService,
     private router: Router,
-    private alertController: AlertController
+    private alertController: AlertController,
+    private toastController: ToastController 
+    
   ) {
     this.initializeApp();
     this.addIonicons();
@@ -64,7 +70,6 @@ export class AppComponent {
           if (isReady) {
             console.log('Database is ready');
             await this.checkAndInsertSeedData();
-            this.checkAuthState(); // Añade esta línea
           }
         },
         error: (error) => {
@@ -73,10 +78,68 @@ export class AppComponent {
         }
       });
   
+      if (Capacitor.isNativePlatform()) {
+        await this.checkPermissions();
+      }
+  
     } catch (error) {
       console.error('Error initializing app:', error);
       await this.presentAlert('Error', 'Failed to initialize the app. Please try again.');
     }
+  }
+
+  async checkPermissions() {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await Filesystem.writeFile({
+          path: 'test.txt',
+          data: 'This is a test',
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8
+        });
+
+        await Filesystem.deleteFile({
+          path: 'test.txt',
+          directory: Directory.Documents
+        });
+
+        console.log('Storage permission granted');
+      } catch (error) {
+        console.error('Storage permission not granted:', error);
+        await this.requestPermissions();
+      }
+    }
+  }
+  async requestPermissions() {
+    if (Capacitor.isNativePlatform()) {
+      const alert = await this.alertController.create({
+        header: 'Permisos necesarios',
+        message: 'Esta aplicación necesita acceso al almacenamiento. Por favor, otorgue los permisos en la configuración de la aplicación.',
+        buttons: [
+          {
+            text: 'Cancelar',
+            role: 'cancel'
+          },
+          {
+            text: 'Entendido',
+            handler: () => {
+              this.presentToast('Por favor, abra la configuración de la aplicación y otorgue los permisos necesarios.');
+            }
+          }
+        ]
+      });
+  
+      await alert.present();
+    }
+  }
+
+  async presentToast(message: string) {
+    const toast = await this.toastController.create({
+      message: message,
+      duration: 3000,
+      position: 'bottom'
+    });
+    toast.present();
   }
 
   private async checkAndInsertSeedData() {
