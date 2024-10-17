@@ -8,4 +8,5 @@ export interface User {
   PhoneNumber?: string;
   HireDate?: Date;
   LastLogin?: Date;
+  ApprovalStatus: 'pending' | 'approved' | 'rejected';
 }

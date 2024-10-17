@@ -1,10 +1,10 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
-import { DatabaseService } from '../services/database.service';
-import { ToastController, LoadingController, AlertController } from '@ionic/angular';
+import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { NgForm } from '@angular/forms';
 import { Router } from '@angular/router';
+import { ToastController, LoadingController, AlertController } from '@ionic/angular';
+import { Subscription, Observable } from 'rxjs';
+import { DatabaseService } from '../services/database.service';
 import { User } from '../models/user.model';
-import { Subscription, Observable, from } from 'rxjs';
-import { mergeMap, map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-perfil',
@@ -12,17 +12,32 @@ import { mergeMap, map } from 'rxjs/operators';
   styleUrls: ['./perfil.page.scss'],
 })
 export class PerfilPage implements OnInit, OnDestroy {
+  @ViewChild('perfilForm') perfilForm!: NgForm;
+  @ViewChild('passwordForm') passwordForm!: NgForm;
+
   showToast: boolean = false;
   toastMessage: string = '';
   
-  usuario: User = {} as User;
+  usuario: User = {
+    UserID: 0,
+    Username: '',
+    Password: '',
+    Role: 'employee',
+    Name: '',
+    Email: '',
+    PhoneNumber: '',
+    HireDate: new Date(),
+    LastLogin: new Date(),
+    ApprovalStatus: 'approved'
+  };
+
   datosContrasena = {
     contrasenaActual: '',
     nuevaContrasena: '',
     confirmarContrasena: ''
   };
-  esAdmin: boolean = false;
 
+  esAdmin: boolean = false;
   private subscriptions: Subscription = new Subscription();
 
   constructor(
@@ -68,34 +83,35 @@ export class PerfilPage implements OnInit, OnDestroy {
   }
 
   private getUserById(userId: number): Promise<User> {
-    const result = this.databaseService.getUserById(userId);
-    
-    if (result instanceof Observable) {
-      return result.toPromise().then(res => {
-        if (res !== undefined) {
-          return res;
-        } else {
-          throw new Error('User not found');
-        }
-      });
-    }
-  
-    return Promise.resolve(result !== undefined ? result : Promise.reject('User not found'));
+    return new Promise((resolve, reject) => {
+      this.databaseService.getUserById(userId).subscribe(
+        (user) => {
+          if (user) {
+            resolve(user);
+          } else {
+            reject(new Error('Usuario no encontrado'));
+          }
+        },
+        (error) => reject(error)
+      );
+    });
   }
 
   async updatePerfil() {
+    if (!this.perfilForm.valid) {
+      await this.presentToast('Por favor, complete todos los campos correctamente.');
+      return;
+    }
+
     const loading = await this.loadingController.create({
       message: 'Actualizando perfil...',
     });
     await loading.present();
   
     try {
-      // Guardamos el rol actual antes de la actualización
       const currentRole = this.usuario.Role;
-  
       const success = await this.updateUser(this.usuario);
       if (success) {
-        // Aseguramos que el rol no haya cambiado
         this.usuario.Role = currentRole;
         await this.presentToast('Perfil actualizado con éxito');
       } else {
@@ -109,22 +125,29 @@ export class PerfilPage implements OnInit, OnDestroy {
     }
   }
 
-  private updateUser(user: User): Promise<boolean> {
-    const result = this.databaseService.updateUserFromDb(user);
-    
-    if (result instanceof Observable) {
-      return result.pipe(
-        map(() => true)
-      ).toPromise().then(res => res !== undefined ? res : false);
+  private async updateUser(user: User): Promise<boolean> {
+    try {
+      const result = await this.databaseService.updateUserFromDb(user);
+      return result !== undefined ? result : false;
+    } catch (error) {
+      console.error('Error updating user:', error);
+      return false;
     }
-  
-    return Promise.resolve(true); // Aquí asumimos que si no es Observable, siempre es exitoso.
   }
-  
 
   async cambiarContrasena() {
+    if (!this.passwordForm.valid) {
+      await this.presentToast('Por favor, complete todos los campos correctamente.');
+      return;
+    }
+
     if (this.datosContrasena.nuevaContrasena !== this.datosContrasena.confirmarContrasena) {
       await this.presentToast('Las contraseñas no coinciden');
+      return;
+    }
+
+    if (this.datosContrasena.nuevaContrasena.length < 8) {
+      await this.presentToast('La nueva contraseña debe tener al menos 8 caracteres');
       return;
     }
 
@@ -155,10 +178,15 @@ export class PerfilPage implements OnInit, OnDestroy {
     await loading.present();
 
     try {
-      const success = await this.updateUserPassword(this.usuario.UserID!, this.datosContrasena.contrasenaActual, this.datosContrasena.nuevaContrasena);
+      const success = await this.updateUserPassword(
+        this.usuario.UserID!,
+        this.datosContrasena.contrasenaActual,
+        this.datosContrasena.nuevaContrasena
+      );
       if (success) {
         await this.presentToast('Contraseña cambiada con éxito');
         this.datosContrasena = { contrasenaActual: '', nuevaContrasena: '', confirmarContrasena: '' };
+        this.passwordForm.resetForm();
       } else {
         throw new Error('No se pudo cambiar la contraseña');
       }
@@ -171,13 +199,12 @@ export class PerfilPage implements OnInit, OnDestroy {
   }
 
   private updateUserPassword(userId: number, currentPassword: string, newPassword: string): Promise<boolean> {
-    const result = this.databaseService.updateUserPassword(userId, currentPassword, newPassword);
-    
-    if (result instanceof Observable) {
-      return result.toPromise().then(res => res !== undefined ? res : false);
-    }
-  
-    return Promise.resolve(false); // O algún otro valor predeterminado si el método no es un Observable.
+    return new Promise((resolve, reject) => {
+      this.databaseService.updateUserPassword(userId, currentPassword, newPassword).subscribe(
+        (success) => resolve(success),
+        (error) => reject(error)
+      );
+    });
   }
 
   async presentToast(message: string) {
@@ -217,8 +244,5 @@ export class PerfilPage implements OnInit, OnDestroy {
     });
 
     await alert.present();
-  }
-
-  ionViewWillLeave() {
   }
 }

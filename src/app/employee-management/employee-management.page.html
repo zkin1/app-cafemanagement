@@ -13,47 +13,23 @@
       <ion-label>
         <h2>{{ user.Name }}</h2>
         <p>{{ user.Email }}</p>
-        <p>Rol: {{ user.Role }}</p>
+        <ion-badge [color]="getApprovalStatusColor(user.ApprovalStatus)">
+          {{ getApprovalStatusLabel(user.ApprovalStatus) }}
+        </ion-badge>
+        <ion-badge [color]="getRoleColor(user.Role)">
+          {{ getRoleLabel(user.Role) }}
+        </ion-badge>
       </ion-label>
-      <ion-button slot="end" (click)="editUser(user)">Editar</ion-button>
+      <ion-button slot="end" (click)="changeApprovalStatus(user)">Cambiar Estado</ion-button>
+      <ion-button slot="end" (click)="changeRole(user)">Cambiar Rol</ion-button>
     </ion-item>
   </ion-list>
-
-  <ion-modal [isOpen]="!!editingUser">
-    <ng-template>
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>Editar Usuario</ion-title>
-          <ion-buttons slot="end">
-            <ion-button (click)="cancelEdit()">Cancelar</ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
-      <ion-content class="ion-padding">
-        <ion-item *ngIf="editingUser">
-          <ion-label position="floating">Nombre</ion-label>
-          <ion-input [(ngModel)]="editingUser.Name"></ion-input>
-        </ion-item>
-        <ion-item *ngIf="editingUser">
-          <ion-label position="floating">Email</ion-label>
-          <ion-input [(ngModel)]="editingUser.Email" type="Email"></ion-input>
-        </ion-item>
-        <ion-item *ngIf="editingUser">
-          <ion-label>Rol</ion-label>
-          <ion-select [(ngModel)]="editingUser.Role">
-            <ion-select-option value="admin">Admin</ion-select-option>
-            <ion-select-option value="empleado">Empleado</ion-select-option>
-          </ion-select>
-        </ion-item>
-        <ion-button expand="block" (click)="saveUser()">Guardar Cambios</ion-button>
-      </ion-content>
-    </ng-template>
-  </ion-modal>
 </ion-content>
+
 <ion-toast
-[isOpen]="showToast"
-[message]="toastMessage"
-[duration]="3000"
-position="top"
-color="primary"
-></ion-toast>
+  [isOpen]="showToast"
+  [message]="toastMessage"
+  [duration]="3000"
+  position="top"
+  [color]="toastColor">
+</ion-toast>

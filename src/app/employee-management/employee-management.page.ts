@@ -1,10 +1,9 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
+import { AlertController, LoadingController, ToastController } from '@ionic/angular';
 import { DatabaseService } from '../services/database.service';
-import { ToastController, LoadingController, AlertController } from '@ionic/angular';
 import { User } from '../models/user.model';
-import { Subscription, Observable, from, of } from 'rxjs';
-import { mergeMap, map, catchError } from 'rxjs/operators';
-import { firstValueFrom } from 'rxjs';
+import { Subscription } from 'rxjs';
+import { first } from 'rxjs/operators';
 
 @Component({
   selector: 'app-employee-management',
@@ -12,20 +11,18 @@ import { firstValueFrom } from 'rxjs';
   styleUrls: ['./employee-management.page.scss'],
 })
 export class EmployeeManagementPage implements OnInit, OnDestroy {
-
+  users: User[] = [];
+  private subscriptions: Subscription = new Subscription();
   showToast: boolean = false;
   toastMessage: string = '';
-  users: User[] = [];
-  editingUser: User | null = null;
-
-  private subscriptions: Subscription = new Subscription();
+  toastColor: string = 'success';
 
   constructor(
     private databaseService: DatabaseService,
-    private toastController: ToastController,
+    private alertController: AlertController,
     private loadingController: LoadingController,
-    private alertController: AlertController
-  ) { }
+    private toastController: ToastController
+  ) {}
 
   ngOnInit() {
     this.loadUsers();
@@ -42,67 +39,66 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
     await loading.present();
 
     try {
-      this.users = await this.getAllUsers();
+      this.subscriptions.add(
+        this.databaseService.getAllUsers().pipe(first()).subscribe(
+          (users) => {
+            this.users = users;
+            loading.dismiss();
+          },
+          (error) => {
+            console.error('Error al cargar empleados:', error);
+            this.presentToast('Error al cargar empleados. Por favor, intente de nuevo.', 'danger');
+            loading.dismiss();
+          }
+        )
+      );
     } catch (error) {
       console.error('Error al cargar empleados:', error);
-      this.presentToast('Error al cargar empleados. Por favor, intente de nuevo.');
-    } finally {
-      await loading.dismiss();
+      this.presentToast('Error al cargar empleados. Por favor, intente de nuevo.', 'danger');
+      loading.dismiss();
     }
-  }
-
-  private async getAllUsers(): Promise<User[]> {
-    const result = this.databaseService.getAllUsers();
-  
-    if (result instanceof Observable) {
-      try {
-        // Convertimos el Observable en Promise y retornamos el valor
-        const users = await firstValueFrom(result.pipe(
-          map(users => users || []), 
-          catchError(() => of([])) 
-        ));
-        return users;
-      } catch (error) {
-        return []; 
-      }
-    }
-  
-    // Si result no es un Observable, retornamos el valor asegurando un array
-    return Promise.resolve(result || []);
   }
 
   async addUser() {
     const alert = await this.alertController.create({
-      header: 'Añadir Empleado',
+      header: 'Agregar Empleado',
       inputs: [
         { name: 'name', type: 'text', placeholder: 'Nombre' },
-        { name: 'email', type: 'email', placeholder: 'Email' },
+        { name: 'email', type: 'email', placeholder: 'Correo electrónico' },
         { name: 'password', type: 'password', placeholder: 'Contraseña' },
         {
+          name: 'role',
           type: 'radio',
           label: 'Empleado',
           value: 'employee',
-          name: 'role'
+          checked: true
         },
         {
+          name: 'role',
           type: 'radio',
-          label: 'Admin',
-          value: 'admin',
-          name: 'role'
+          label: 'Administrador',
+          value: 'admin'
         },
         {
+          name: 'approvalStatus',
           type: 'radio',
-          label: 'Manager',
-          value: 'manager',
-          name: 'role'
+          label: 'Aprobado',
+          value: 'approved',
+          checked: true
+        },
+        {
+          name: 'approvalStatus',
+          type: 'radio',
+          label: 'Pendiente',
+          value: 'pending'
         }
       ],
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {
-          text: 'Añadir',
+          text: 'Agregar',
           handler: (data) => {
-            this.createNewUser(data);
+            this.createUser(data);
           }
         }
       ]
@@ -111,102 +107,151 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
     await alert.present();
   }
 
-  private async createNewUser(data: any) {
-    if (!data.name || !data.email || !data.password || !data.role) {
-      this.presentToast('Por favor, complete todos los campos');
+  async createUser(userData: {name: string, email: string, password: string, role: 'employee' | 'admin', approvalStatus: 'approved' | 'pending'}) {
+    if (!userData.name || !userData.email || !userData.password) {
+      this.presentToast('Por favor, complete todos los campos', 'danger');
       return;
     }
 
-    const loading = await this.loadingController.create({
-      message: 'Añadiendo empleado...',
-    });
-    await loading.present();
-
     const newUser: User = {
-      Name: data.name,
-      Email: data.email,
-      Password: data.password,
-      Role: data.role,
-      Username: data.email
+      Name: userData.name,
+      Email: userData.email,
+      Password: userData.password,
+      Role: userData.role,
+      Username: userData.email,
+      ApprovalStatus: userData.approvalStatus
     };
 
     try {
-      const userId = await this.createUser(newUser);
-      if (userId !== undefined) {
+      const userId = await this.databaseService.createUser(newUser);
+      if (userId) {
         newUser.UserID = userId;
         this.users.push(newUser);
-        this.presentToast('Empleado añadido con éxito');
-      } else {
-        throw new Error('No se pudo crear el usuario');
+        this.presentToast('Usuario creado con éxito', 'success');
       }
     } catch (error) {
-      console.error('Error al añadir empleado:', error);
-      this.presentToast('Error al añadir empleado. Por favor, intente de nuevo.');
-    } finally {
-      await loading.dismiss();
+      console.error('Error al crear usuario:', error);
+      this.presentToast('Error al crear usuario', 'danger');
     }
   }
 
-  private createUser(user: User): Promise<number | undefined> {
-    const result = this.databaseService.createUser(user);
-    if (result instanceof Observable) {
-      return result.pipe(
-        map(id => id),
-        catchError(() => of(undefined))
-      ).toPromise();
-    }
-    return Promise.resolve(result);
-  }
-
-  editUser(user: User) {
-    this.editingUser = { ...user };
-  }
-
-  async saveUser() {
-    if (!this.editingUser) return;
-
-    const loading = await this.loadingController.create({
-      message: 'Guardando cambios...',
-    });
-    await loading.present();
-
-    try {
-      const success = await this.updateUser(this.editingUser);
-      if (success) {
-        const index = this.users.findIndex(u => u.UserID === this.editingUser!.UserID);
-        if (index !== -1) {
-          this.users[index] = { ...this.editingUser };
+  async changeRole(user: User) {
+    const alert = await this.alertController.create({
+      header: 'Cambiar Rol',
+      message: `Cambiar rol de ${user.Name}`,
+      inputs: [
+        {
+          name: 'role',
+          type: 'radio',
+          label: 'Empleado',
+          value: 'employee',
+          checked: user.Role === 'employee'
+        },
+        {
+          name: 'role',
+          type: 'radio',
+          label: 'Administrador',
+          value: 'admin',
+          checked: user.Role === 'admin'
         }
-        this.presentToast('Usuario actualizado con éxito');
-        this.editingUser = null;
-      } else {
-        throw new Error('No se pudo actualizar el usuario');
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Cambiar',
+          handler: async (data) => {
+            user.Role = data;
+            await this.updateUser(user);
+          }
+        }
+      ]
+    });
+
+    await alert.present();
+  }
+
+  async changeApprovalStatus(user: User) {
+    const alert = await this.alertController.create({
+      header: 'Cambiar Estado de Aprobación',
+      message: `Cambiar estado de aprobación de ${user.Name}`,
+      inputs: [
+        {
+          name: 'approvalStatus',
+          type: 'radio',
+          label: 'Aprobado',
+          value: 'approved',
+          checked: user.ApprovalStatus === 'approved'
+        },
+        {
+          name: 'approvalStatus',
+          type: 'radio',
+          label: 'Pendiente',
+          value: 'pending',
+          checked: user.ApprovalStatus === 'pending'
+        },
+        {
+          name: 'approvalStatus',
+          type: 'radio',
+          label: 'Rechazado',
+          value: 'rejected',
+          checked: user.ApprovalStatus === 'rejected'
+        }
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Cambiar',
+          handler: async (data) => {
+            await this.updateUserApprovalStatus(user, data);
+          }
+        }
+      ]
+    });
+
+    await alert.present();
+  }
+
+  async updateUser(user: User) {
+    try {
+      const success = await this.databaseService.updateUserFromDb(user);
+      if (success) {
+        this.presentToast('Usuario actualizado con éxito', 'success');
+        const index = this.users.findIndex(u => u.UserID === user.UserID);
+        if (index !== -1) {
+          this.users[index] = { ...user };
+        }
       }
     } catch (error) {
       console.error('Error al actualizar usuario:', error);
-      this.presentToast('Error al actualizar usuario. Por favor, intente de nuevo.');
-    } finally {
-      await loading.dismiss();
+      this.presentToast('Error al actualizar usuario', 'danger');
     }
   }
 
-  private updateUser(user: User): Promise<boolean> {
-    const result = this.databaseService.updateUserFromDb(user);
+  async updateUserApprovalStatus(user: User, status: 'approved' | 'pending' | 'rejected') {
+    try {
+      let success: boolean;
+      
+      if (status === 'pending') {
+        // Si el estado es 'pending', simplemente actualizamos el usuario localmente
+        success = true;
+      } else {
+        // Si el estado es 'approved' o 'rejected', llamamos al método del servicio
+        const result = await this.databaseService.updateUserApprovalStatus(user.UserID!, status).toPromise();
+        success = result !== undefined ? result : false;
+      }
   
-    if (result instanceof Observable) {
-      return result.pipe(
-        map(() => true), // Si el observable es exitoso, retornamos `true`
-        catchError(() => of(false)) // En caso de error, devolvemos `false`
-      )
-      .toPromise()
-      .then(res => res !== undefined ? res : false); // Garantizamos que no se devuelva `undefined`
+      if (success) {
+        user.ApprovalStatus = status;
+        this.presentToast(`Usuario ${status === 'approved' ? 'aprobado' : status === 'pending' ? 'pendiente' : 'rechazado'} con éxito`, 'success');
+        await this.loadUsers(); // Recargar la lista de usuarios
+      } else {
+        throw new Error('No se pudo actualizar el estado de aprobación');
+      }
+    } catch (error) {
+      console.error('Error al actualizar el estado de aprobación:', error);
+      this.presentToast('Error al actualizar el estado de aprobación', 'danger');
     }
-  
-    // Aseguramos que si `result` es `undefined`, devolvemos `false`
-    return Promise.resolve(result !== undefined ? true : false);
   }
-  
-
   async deleteUser(user: User) {
     const alert = await this.alertController.create({
       header: 'Confirmar eliminación',
@@ -215,8 +260,15 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
         { text: 'Cancelar', role: 'cancel' },
         {
           text: 'Eliminar',
-          handler: () => {
-            this.performUserDeletion(user);
+          handler: async () => {
+            try {
+              await this.databaseService.deleteUser(user.UserID!).toPromise();
+              this.users = this.users.filter(u => u.UserID !== user.UserID);
+              this.presentToast('Usuario eliminado con éxito', 'success');
+            } catch (error) {
+              console.error('Error al eliminar usuario:', error);
+              this.presentToast('Error al eliminar usuario', 'danger');
+            }
           }
         }
       ]
@@ -225,53 +277,90 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
     await alert.present();
   }
 
-  private async performUserDeletion(user: User) {
-    const loading = await this.loadingController.create({
-      message: 'Eliminando empleado...',
-    });
-    await loading.present();
-
-    try {
-      const success = await this.deleteUserFromDb(user.UserID!);
-      if (success) {
-        this.users = this.users.filter(u => u.UserID !== user.UserID);
-        this.presentToast('Empleado eliminado con éxito');
-      } else {
-        throw new Error('No se pudo eliminar el usuario');
-      }
-    } catch (error) {
-      console.error('Error al eliminar empleado:', error);
-      this.presentToast('Error al eliminar empleado. Por favor, intente de nuevo.');
-    } finally {
-      await loading.dismiss();
-    }
-  }
-
-  private async deleteUserFromDb(userId: number): Promise<boolean> {
-    const result = this.databaseService.deleteUser(userId);
-
-    if (result instanceof Observable) {
-      try {
-        await firstValueFrom(result);
-        return true; 
-      } catch (error) {
-        return false; 
-      }
-    }
-    return Promise.resolve(result !== undefined && result !== false);
-  }
-  
-
-  async presentToast(message: string) {
+  async presentToast(message: string, color: string = 'success') {
     const toast = await this.toastController.create({
       message: message,
       duration: 2000,
-      position: 'top'
+      position: 'bottom',
+      color: color
     });
-    await toast.present();
+    toast.present();
   }
 
-  cancelEdit() {
-    this.editingUser = null;
+  getRoleColor(role: string): string {
+    return role === 'admin' ? 'primary' : 'secondary';
+  }
+
+  getApprovalStatusColor(status: string): string {
+    switch (status) {
+      case 'approved':
+        return 'success';
+      case 'pending':
+        return 'warning';
+      case 'rejected':
+        return 'danger';
+      default:
+        return 'medium';
+    }
+  }
+
+  getRoleLabel(role: string): string {
+    switch (role) {
+      case 'admin':
+        return 'Administrador';
+      case 'employee':
+        return 'Empleado';
+      default:
+        return role;
+    }
+  }
+
+  getApprovalStatusLabel(status: string): string {
+    switch (status) {
+      case 'approved':
+        return 'Aprobado';
+      case 'pending':
+        return 'Pendiente';
+      case 'rejected':
+        return 'Rechazado';
+      default:
+        return status;
+    }
+  }
+
+  async editUser(user: User) {
+    const alert = await this.alertController.create({
+      header: 'Editar Usuario',
+      inputs: [
+        {
+          name: 'name',
+          type: 'text',
+          value: user.Name,
+          placeholder: 'Nombre'
+        },
+        {
+          name: 'email',
+          type: 'email',
+          value: user.Email,
+          placeholder: 'Correo electrónico'
+        }
+      ],
+      buttons: [
+        {
+          text: 'Cancelar',
+          role: 'cancel'
+        },
+        {
+          text: 'Guardar',
+          handler: (data) => {
+            user.Name = data.name;
+            user.Email = data.email;
+            this.updateUser(user);
+          }
+        }
+      ]
+    });
+
+    await alert.present();
   }
 }

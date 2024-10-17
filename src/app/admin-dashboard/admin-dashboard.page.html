@@ -12,8 +12,29 @@
       <ion-card-title>Resumen</ion-card-title>
     </ion-card-header>
     <ion-card-content>
-      <p>Ordenes de  hoy: {{ orderCount }}</p>
+      <p>Órdenes de hoy: {{ orderCount }}</p>
       <p>Empleados activos: {{ activeEmployees }}</p>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Usuarios Pendientes de Aprobación</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-list *ngIf="pendingUsers.length > 0; else noPendingUsers">
+        <ion-item *ngFor="let user of pendingUsers">
+          <ion-label>
+            <h2>{{ user.Name }}</h2>
+            <p>{{ user.Email }}</p>
+          </ion-label>
+          <ion-button slot="end" (click)="approveUser(user.UserID ?? 0)">Aprobar</ion-button>
+          <ion-button slot="end" color="danger" (click)="rejectUser(user.UserID ?? 0)">Rechazar</ion-button>
+        </ion-item>
+      </ion-list>
+      <ng-template #noPendingUsers>
+        <p>No hay usuarios pendientes de aprobación.</p>
+      </ng-template>
     </ion-card-content>
   </ion-card>
 

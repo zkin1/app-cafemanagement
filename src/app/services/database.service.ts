@@ -9,6 +9,8 @@ import { of, firstValueFrom, forkJoin } from 'rxjs';
 import { Product } from '../models/product.model';
 import { Order } from '../models/order.model';
 import { OrderDetail } from '../models/order-detail.model';
+import { Plugins } from '@capacitor/core';
+const { Console } = Plugins;
 
 
 @Injectable({
@@ -47,17 +49,18 @@ export class DatabaseService {
 
   // Tablas
   tableUsers: string = `
-    CREATE TABLE IF NOT EXISTS Users (
-      UserID INTEGER PRIMARY KEY AUTOINCREMENT,
-      Username TEXT NOT NULL UNIQUE,
-      Password TEXT NOT NULL,
-      Role TEXT NOT NULL CHECK (Role IN ('employee', 'admin', 'manager')),
-      Name TEXT NOT NULL,
-      Email TEXT UNIQUE,
-      PhoneNumber TEXT,
-      HireDate DATE,
-      LastLogin DATETIME
-    );`;
+  CREATE TABLE IF NOT EXISTS Users (
+    UserID INTEGER PRIMARY KEY AUTOINCREMENT,
+    Username TEXT NOT NULL UNIQUE,
+    Password TEXT NOT NULL,
+    Role TEXT NOT NULL CHECK (Role IN ('employee', 'admin', 'manager')),
+    Name TEXT NOT NULL,
+    Email TEXT UNIQUE,
+    PhoneNumber TEXT,
+    HireDate DATE,
+    LastLogin DATETIME,
+    ApprovalStatus TEXT NOT NULL CHECK (ApprovalStatus IN ('pending', 'approved', 'rejected'))
+  );`;
 
   tableProducts: string = `
     CREATE TABLE IF NOT EXISTS Products (
@@ -191,13 +194,24 @@ export class DatabaseService {
   }
 
   // Métodos CRUD para Users
-  async createUser(user: User): Promise<number> {
-    const data = [user.Username, user.Password, user.Role, user.Name, user.Email, user.PhoneNumber, user.HireDate?.toISOString()];
-    const result = await this.database.executeSql('INSERT INTO Users (Username, Password, Role, Name, Email, PhoneNumber, HireDate) VALUES (?, ?, ?, ?, ?, ?, ?)', data);
-    this.getAllUsers();
-    return result.insertId;
+  async createUser(user: User): Promise<number | null> {
+    console.log('Iniciando creación de usuario en la base de datos');
+    try {
+      const result = await this.database.executeSql(
+        'INSERT INTO Users (Username, Password, Role, Name, Email, ApprovalStatus) VALUES (?, ?, ?, ?, ?, ?)',
+        [user.Username, user.Password, user.Role, user.Name, user.Email, user.ApprovalStatus]
+      );
+      console.log('Usuario insertado con éxito, ID:', result.insertId);
+      return result.insertId;
+    } catch (error: unknown) {
+      console.error('Error al crear usuario:', error);
+      if (error instanceof Error && error.message.includes('UNIQUE constraint failed: Users.Email')) {
+        console.log('Error de email duplicado');
+        return null;
+      }
+      throw error;
+    }
   }
-
   getAllUsers(): Observable<User[]> {
     return from(this.database.executeSql('SELECT * FROM Users', [])).pipe(
       map(data => {
@@ -210,6 +224,34 @@ export class DatabaseService {
     );
   }
 
+  getPendingUsers(): Observable<User[]> {
+    return from(this.database.executeSql('SELECT * FROM Users WHERE ApprovalStatus = ?', ['pending'])).pipe(
+      map(data => {
+        let users: User[] = [];
+        for (let i = 0; i < data.rows.length; i++) {
+          users.push(data.rows.item(i));
+        }
+        return users;
+      })
+    );
+  }
+
+  updateUserApprovalStatus(userId: number, status: 'approved' | 'rejected' | 'pending'): Observable<boolean> {
+    console.log(`Actualizando estado de aprobación para usuario ${userId} a ${status}`);
+    return from(this.database.executeSql(
+      'UPDATE Users SET ApprovalStatus = ? WHERE UserID = ?',
+      [status, userId]
+    )).pipe(
+      map(result => {
+        console.log('Resultado de la actualización:', result);
+        return result.rowsAffected > 0;
+      }),
+      catchError(error => {
+        console.error('Error al actualizar el estado de aprobación:', error);
+        return of(false);
+      })
+    );
+  }
   // Métodos CRUD para Products
   async createProduct(product: Product): Promise<number> {
     const data = [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0];
@@ -286,29 +328,36 @@ export class DatabaseService {
   // Método de autenticación
   async authenticateUser(email: string, password: string): Promise<User | null> {
     console.log('Intentando autenticar usuario:', email);
-    const data = await this.database.executeSql(
-      'SELECT * FROM Users WHERE Email = ? AND Password = ?', 
-      [email, password]
-    );
-    console.log('Resultado de la consulta:', data);
-    if (data.rows.length > 0) {
-      const user: User = {
-        UserID: data.rows.item(0).UserID,
-        Username: data.rows.item(0).Username,
-        Password: data.rows.item(0).Password,
-        Role: data.rows.item(0).Role,
-        Name: data.rows.item(0).Name,
-        Email: data.rows.item(0).Email,
-        PhoneNumber: data.rows.item(0).PhoneNumber,
-        HireDate: data.rows.item(0).HireDate ? new Date(data.rows.item(0).HireDate) : undefined,
-        LastLogin: data.rows.item(0).LastLogin ? new Date(data.rows.item(0).LastLogin) : undefined
-      };
-      console.log('Usuario autenticado:', JSON.stringify(user));
-      return user;
+    try {
+      const query = 'SELECT * FROM Users WHERE Email = ?';
+      const result = await this.database.executeSql(query, [email]);
+      console.log('Resultado de la consulta:', JSON.stringify(result));
+  
+      if (result.rows.length > 0) {
+        const user = result.rows.item(0);
+        console.log('Usuario encontrado:', JSON.stringify(user));
+        if (user.Password === password) {
+          console.log('Contraseña correcta');
+          if (user.ApprovalStatus === 'approved') {
+            console.log('Usuario aprobado');
+            return user;
+          } else {
+            console.log('Usuario no aprobado. Estado:', user.ApprovalStatus);
+            return null;
+          }
+        } else {
+          console.log('Contraseña incorrecta');
+        }
+      } else {
+        console.log('No se encontró usuario con ese email');
+      }
+      return null;
+    } catch (error) {
+      console.error('Error durante la autenticación:', error);
+      throw error;
     }
-    console.log('No se encontró usuario');
-    return null;
   }
+
 
   pdateProduct(product: Product): Promise<boolean> | Observable<any> {
     const data = [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0, product.id];
@@ -507,21 +556,26 @@ export class DatabaseService {
   }
 
   getUserByEmail(email: string): Observable<User | null> {
-    return new Observable(observer => {
-      const sql = 'SELECT * FROM Users WHERE Email = ?';
-      this.database.executeSql(sql, [email])
-        .then(data => {
-          if (data.rows.length > 0) {
-            observer.next(data.rows.item(0));
-          } else {
-            observer.next(null);
-          }
-          observer.complete();
-        })
-        .catch(e => observer.error(e));
-    });
+    return from(this.database.executeSql('SELECT * FROM Users WHERE Email = ?', [email])).pipe(
+      map(data => {
+        if (data.rows.length > 0) {
+          return {
+            UserID: data.rows.item(0).UserID,
+            Username: data.rows.item(0).Username,
+            Password: data.rows.item(0).Password,
+            Role: data.rows.item(0).Role,
+            Name: data.rows.item(0).Name,
+            Email: data.rows.item(0).Email,
+            PhoneNumber: data.rows.item(0).PhoneNumber,
+            HireDate: data.rows.item(0).HireDate ? new Date(data.rows.item(0).HireDate) : undefined,
+            LastLogin: data.rows.item(0).LastLogin ? new Date(data.rows.item(0).LastLogin) : undefined,
+            ApprovalStatus: data.rows.item(0).ApprovalStatus
+          };
+        }
+        return null;
+      })
+    );
   }
-
   updateUserPassword(userId: number, currentPassword: string, newPassword: string): Observable<boolean> {
     const sql = 'UPDATE Users SET Password = ? WHERE UserID = ? AND Password = ?';
     const data = [newPassword, userId, currentPassword];
@@ -543,8 +597,8 @@ export class DatabaseService {
 
   insertSeedData(): Observable<boolean> {
     const users = [
-      { username: 'admin', password: 'admin123', role: 'admin', name: 'Admin User', email: 'admin@example.com' },
-      { username: 'employee1', password: 'emp123', role: 'employee', name: 'Employee One', email: 'emp1@example.com' }
+      { username: 'admin', password: 'admin123', role: 'admin', name: 'Admin User', email: 'admin@example.com', approvalStatus: 'approved' },
+      { username: 'employee1', password: 'emp123', role: 'employee', name: 'Employee One', email: 'emp1@example.com', approvalStatus: 'approved' }
     ];
   
     const products = [
@@ -560,8 +614,8 @@ export class DatabaseService {
       switchMap(() => {
         const userInserts = users.map(user => 
           this.database.executeSql(
-            'INSERT INTO Users (Username, Password, Role, Name, Email) VALUES (?, ?, ?, ?, ?)', 
-            [user.username, user.password, user.role, user.name, user.email]
+            'INSERT INTO Users (Username, Password, Role, Name, Email, ApprovalStatus) VALUES (?, ?, ?, ?, ?, ?)', 
+            [user.username, user.password, user.role, user.name, user.email, user.approvalStatus]
           )
         );
   
@@ -631,5 +685,8 @@ export class DatabaseService {
       throw error;
     }
   }
+
+  
   
 }
+

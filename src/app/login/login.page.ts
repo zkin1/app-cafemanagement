@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { DatabaseService } from '../services/database.service';
 import { ToastController } from '@ionic/angular';
 import { User } from '../models/user.model';
-
+import { firstValueFrom } from 'rxjs';
 @Component({
   selector: 'app-login',
   templateUrl: './login.page.html',
@@ -24,24 +24,34 @@ export class LoginPage {
   ) {}
 
   async onSubmit() {
+    console.log('Iniciando proceso de login');
     if (!this.email || !this.password) {
       await this.presentToast('Por favor, ingrese email y contraseña.');
       return;
     }
   
     try {
+      console.log('Intentando autenticar:', this.email);
       const user = await this.databaseService.authenticateUser(this.email, this.password);
-      console.log('Authentication response:', user);
+      console.log('Resultado de autenticación:', user);
+      
       if (user) {
-        await this.handleSuccessfulLogin(user);
+        if (user.ApprovalStatus === 'approved') {
+          await this.handleSuccessfulLogin(user);
+        } else if (user.ApprovalStatus === 'pending') {
+          await this.presentToast('Su cuenta está pendiente de aprobación. Por favor, espere la confirmación del administrador.');
+        } else {
+          await this.presentToast('Su cuenta ha sido rechazada. Por favor, contacte al administrador.');
+        }
       } else {
         await this.presentToast('Credenciales incorrectas. Por favor, intente de nuevo.');
       }
     } catch (error) {
-      console.error('Error during login:', error);
+      console.error('Error durante login:', error);
       await this.presentToast('Ocurrió un error durante el inicio de sesión. Por favor, intente de nuevo.');
     }
   }
+
 
   private async handleSuccessfulLogin(user: User) {
     console.log('Usuario autenticado:', JSON.stringify(user));
