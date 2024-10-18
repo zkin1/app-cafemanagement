@@ -34,7 +34,6 @@ export class AppComponent {
     private router: Router,
     private alertController: AlertController,
     private toastController: ToastController 
-    
   ) {
     this.initializeApp();
     this.addIonicons();
@@ -69,7 +68,6 @@ export class AppComponent {
         next: async (isReady) => {
           if (isReady) {
             console.log('Database is ready');
-            await this.checkAndInsertSeedData();
           }
         },
         error: (error) => {
@@ -192,9 +190,7 @@ get isAdmin(): boolean {
 
   logout() {
     localStorage.removeItem('currentUser');
-    this.router.navigate(['/login']).then(() => {
-      window.location.reload(); 
-    });
+    this.router.navigate(['/login']);
   }
 
   checkAuthState() {

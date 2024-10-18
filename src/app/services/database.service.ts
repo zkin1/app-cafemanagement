@@ -2,8 +2,7 @@ import { Injectable } from '@angular/core';
 import { SQLite, SQLiteObject } from '@awesome-cordova-plugins/sqlite/ngx';
 import { AlertController, Platform } from '@ionic/angular';
 import { BehaviorSubject, Observable, from } from 'rxjs';
-import { map } from 'rxjs/operators';
-import {catchError, switchMap } from 'rxjs/operators';
+import { map, catchError, switchMap } from 'rxjs/operators';
 import { User } from '../models/user.model';
 import { of, firstValueFrom, forkJoin } from 'rxjs';
 import { Product } from '../models/product.model';
@@ -32,18 +31,36 @@ export class DatabaseService {
 
   async initializeDatabase() {
     try {
-      // Crear una nueva base de datos
       this.database = await this.sqlite.create({
         name: 'cafeteria.db',
         location: 'default'
       });
-  
-      await this.createTables();
-      await firstValueFrom(this.insertSeedData());
+
+      await this.createTablesIfNotExist();
+      await this.insertSeedDataIfEmpty();
       this.dbReady.next(true);
     } catch (error) {
       console.error('Error initializing database', error);
       this.presentAlert('Error', 'Failed to initialize the database. Please try again.');
+    }
+  }
+
+  async createTablesIfNotExist() {
+    const tables = [this.tableUsers, this.tableProducts, this.tableOrders, this.tableOrderDetails, this.tableSalesReports];
+    for (const table of tables) {
+      await this.database.executeSql(table, []);
+    }
+  }
+
+  async getUserCount(): Promise<number> {
+    const result = await this.database.executeSql('SELECT COUNT(*) as count FROM Users', []);
+    return result.rows.item(0).count;
+  }
+
+  async insertSeedDataIfEmpty() {
+    const userCount = await this.getUserCount();
+    if (userCount === 0) {
+      await firstValueFrom(this.insertSeedData());
     }
   }
 
@@ -595,7 +612,7 @@ export class DatabaseService {
   // Método para insertar datos de prueba
 
 
-  insertSeedData(): Observable<boolean> {
+insertSeedData(): Observable<boolean> {
     const users = [
       { username: 'admin', password: 'admin123', role: 'admin', name: 'Admin User', email: 'admin@example.com', approvalStatus: 'approved' },
       { username: 'employee1', password: 'emp123', role: 'employee', name: 'Employee One', email: 'emp1@example.com', approvalStatus: 'approved' }
@@ -608,26 +625,19 @@ export class DatabaseService {
     ];
   
     return forkJoin([
-      from(this.database.executeSql('DELETE FROM Users', [])),
-      from(this.database.executeSql('DELETE FROM Products', []))
+      ...users.map(user => 
+        from(this.database.executeSql(
+          'INSERT OR IGNORE INTO Users (Username, Password, Role, Name, Email, ApprovalStatus) VALUES (?, ?, ?, ?, ?, ?)', 
+          [user.username, user.password, user.role, user.name, user.email, user.approvalStatus]
+        ))
+      ),
+      ...products.map(product => 
+        from(this.database.executeSql(
+          'INSERT OR IGNORE INTO Products (Name, Description, Price, Category, ImageURL, IsAvailable) VALUES (?, ?, ?, ?, ?, ?)', 
+          [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0]
+        ))
+      )
     ]).pipe(
-      switchMap(() => {
-        const userInserts = users.map(user => 
-          this.database.executeSql(
-            'INSERT INTO Users (Username, Password, Role, Name, Email, ApprovalStatus) VALUES (?, ?, ?, ?, ?, ?)', 
-            [user.username, user.password, user.role, user.name, user.email, user.approvalStatus]
-          )
-        );
-  
-        const productInserts = products.map(product => 
-          this.database.executeSql(
-            'INSERT INTO Products (Name, Description, Price, Category, ImageURL, IsAvailable) VALUES (?, ?, ?, ?, ?, ?)', 
-            [product.name, product.description, product.price, product.category, product.imageURL, product.isAvailable ? 1 : 0]
-          )
-        );
-  
-        return forkJoin([...userInserts, ...productInserts]);
-      }),
       map(() => true),
       catchError(error => {
         console.error('Error in insertSeedData:', error);
@@ -685,8 +695,6 @@ export class DatabaseService {
       throw error;
     }
   }
-
-  
   
 }
 
