@@ -11,9 +11,11 @@ import { User } from '../models/user.model';
 })
 export class AdminDashboardPage implements OnInit {
   adminName: string = 'Admin';
+  adminProfilePicture: string | null = null;
   orderCount: number = 0;
   activeEmployees: number = 0;
   pendingUsers: User[] = [];
+  profilePicture: string | null = null;
 
   constructor(
     private router: Router,
@@ -25,8 +27,13 @@ export class AdminDashboardPage implements OnInit {
   ngOnInit() {
     this.loadDashboardData();
     this.loadPendingUsers();
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    this.profilePicture = currentUser.profilePicture || null;
   }
 
+  handleImageError(event: any) {
+    event.target.src = 'assets/default-avatar.png';
+  }
   async loadDashboardData() {
     const loading = await this.loadingController.create({
       message: 'Cargando datos...',
@@ -36,18 +43,36 @@ export class AdminDashboardPage implements OnInit {
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       this.adminName = currentUser.name || 'Admin';
+      this.adminProfilePicture = currentUser.profilePicture || null;
+  
+      // Si no hay foto en localStorage, intenta cargarla de la base de datos
+      if (!this.adminProfilePicture && currentUser.id) {
+        try {
+          const profilePicture = await this.databaseService.getUserProfilePicture(currentUser.id).toPromise();
+          this.adminProfilePicture = profilePicture !== undefined ? profilePicture : null;
+          // Actualizar el localStorage con la imagen cargada
+          if (this.adminProfilePicture) {
+            currentUser.profilePicture = this.adminProfilePicture;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+          }
+        } catch (error) {
+          console.error('Error al cargar la foto de perfil:', error);
+        }
+      }
   
       // Obtener el número real de órdenes del día
       this.orderCount = await this.databaseService.getOrderCountForToday();
+      console.log('Número de órdenes del día:', this.orderCount);
   
       // Obtener el número real de empleados activos
       this.activeEmployees = await this.databaseService.getActiveEmployeesCount();
+      console.log('Número de empleados activos:', this.activeEmployees);
   
     } catch (error) {
       console.error('Error al cargar datos del dashboard:', error);
-      this.presentToast('Error al cargar datos. Por favor, intente de nuevo.');
+      await this.presentToast('Error al cargar datos. Por favor, intente de nuevo.');
     } finally {
-      loading.dismiss();
+      await loading.dismiss();
     }
   }
 

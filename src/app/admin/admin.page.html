@@ -1,18 +1,20 @@
-<ion-header>
+<ion-header class="ion-no-border">
   <ion-toolbar>
     <ion-buttons slot="start">
       <ion-menu-button></ion-menu-button>
     </ion-buttons>
-    <ion-title>Panel de Administración</ion-title>
+    <ion-title class="ion-text-center">Dashboard de Administrador</ion-title>
   </ion-toolbar>
 </ion-header>
-
 <ion-content class="ion-padding">
+  <h1 class="main-title">Panel de Administración</h1>
+
   <ion-grid>
     <ion-row>
       <ion-col size="12" size-md="6">
-        <ion-card class="dashboard-card">
+        <ion-card class="dashboard-card sales-card">
           <ion-card-header>
+            <ion-icon name="cash-outline" color="primary"></ion-icon>
             <ion-card-title>Ventas Totales</ion-card-title>
           </ion-card-header>
           <ion-card-content>
@@ -21,8 +23,9 @@
         </ion-card>
       </ion-col>
       <ion-col size="12" size-md="6">
-        <ion-card class="dashboard-card">
+        <ion-card class="dashboard-card canceled-orders-card">
           <ion-card-header>
+            <ion-icon name="close-circle-outline" color="danger"></ion-icon>
             <ion-card-title>Órdenes Canceladas</ion-card-title>
           </ion-card-header>
           <ion-card-content>
@@ -34,30 +37,56 @@
     </ion-row>
 
     <ion-row>
-      <ion-col size="12" size-md="6">
-        <ion-card class="dashboard-card">
+      <ion-col size="12">
+        <ion-card class="dashboard-card weekly-sales-card">
           <ion-card-header>
+            <ion-icon name="calendar-outline" color="tertiary"></ion-icon>
+            <ion-card-title>Ventas de la Semana</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="week-container">
+              <div class="day-card" *ngFor="let day of dailySales" (click)="showDayDetails(day)">
+                <h3>{{ day.day }}</h3>
+                <p>{{ day.amount | currency:'CLP':'symbol-narrow':'1.0-0' }}</p>
+              </div>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+
+    <ion-row *ngIf="selectedDay">
+      <ion-col size="12">
+        <ion-card class="dashboard-card day-details-card">
+          <ion-card-header>
+            <ion-icon name="analytics-outline" color="success"></ion-icon>
+            <ion-card-title>Detalle del {{ selectedDay.day }}</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <p>Ventas: {{ selectedDay.amount | currency:'CLP':'symbol-narrow':'1.0-0' }}</p>
+            <p>Órdenes Canceladas: {{ ordenesCancel.cantidad }}</p>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+
+    <ion-row>
+      <ion-col size="12">
+        <ion-card class="dashboard-card top-products-card">
+          <ion-card-header>
+            <ion-icon name="trophy-outline" color="warning"></ion-icon>
             <ion-card-title>Productos Más Vendidos</ion-card-title>
           </ion-card-header>
           <ion-card-content>
-            <ion-list>
+            <ion-list lines="none">
               <ion-item *ngFor="let product of topProducts; let i = index">
                 <ion-label>
                   <h2>{{ i + 1 }}. {{ product.name }}</h2>
                   <p>Ventas: {{ product.sales }}</p>
                 </ion-label>
+                <ion-badge slot="end" color="primary">{{ product.sales }}</ion-badge>
               </ion-item>
             </ion-list>
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
-      <ion-col size="12" size-md="6">
-        <ion-card class="dashboard-card">
-          <ion-card-header>
-            <ion-card-title>Ventas por Día</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <canvas #dailySalesChart></canvas>
           </ion-card-content>
         </ion-card>
       </ion-col>
@@ -65,7 +94,7 @@
   </ion-grid>
 
   <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-    <ion-fab-button (click)="generateReport()">
+    <ion-fab-button (click)="generateReport()" color="tertiary">
       <ion-icon name="document-text-outline"></ion-icon>
     </ion-fab-button>
   </ion-fab>

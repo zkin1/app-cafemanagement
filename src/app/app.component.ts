@@ -27,6 +27,7 @@ import {
   styleUrls: ['app.component.scss'],
 })
 export class AppComponent {
+  profilePicture: string | null = null;
   
   constructor(
     private platform: Platform,
@@ -52,6 +53,10 @@ export class AppComponent {
       briefcaseOutline,
       cafeOutline
     });
+  }
+
+  handleImageError(event: any) {
+    event.target.src = 'assets/default-avatar.png';
   }
 
   async initializeApp() {

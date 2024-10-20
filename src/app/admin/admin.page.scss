@@ -1,10 +1,12 @@
 :host {
-  --color-background: #ebf5fb;
-  --color-text: #1c2833;
-  --color-light: #f7f9f9;
+  --color-background: #D4E7EE;
+  --color-text: #405770;
+  --color-light: #F7F9F9;
   --color-border: #E0D8D3;
-  --color-button: #1c2833;
-  --color-primary: #3498db;
+  --color-button: #405770;
+  --color-primary: #84B0A2;
+  --color-secondary: #D4A082;
+  --color-tertiary: #ECC9A3;
   --color-success: #2ecc71;
   --color-warning: #f39c12;
   --color-danger: #e74c3c;
@@ -17,56 +19,95 @@ ion-content {
 .main-title {
   font-size: 28px;
   font-weight: bold;
-  color: var(--color-primary);
-  margin-bottom: 20px;
-}
-
-.section-title {
-  font-size: 24px;
   color: var(--color-text);
-  margin-bottom: 20px;
-  font-weight: 600;
+  margin-bottom: 24px;
+  text-align: center;
 }
 
 ion-card {
   background-color: var(--color-light);
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   overflow: hidden;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  }
 }
 
-.total-sales-card {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-success));
-
+.dashboard-card {
   ion-card-header {
-    background: rgba(255, 255, 255, 0.1);
+    background-color: rgba(var(--ion-color-primary-rgb), 0.1);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+
+    ion-icon {
+      font-size: 24px;
+      margin-right: 12px;
+    }
+
+    ion-card-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--color-text);
+      margin: 0;
+    }
   }
 
-  ion-card-title, .total-amount {
-    color: white;
+  ion-card-content {
+    padding: 20px;
   }
 
-  .total-amount {
+  .big-number {
     font-size: 36px;
     font-weight: bold;
+    color: var(--color-primary);
+    margin: 16px 0;
     text-align: center;
-    margin-top: 20px;
+
+    &.danger {
+      color: var(--color-danger);
+    }
   }
 }
 
 .top-products-card {
-  ion-item {
-    --background: transparent;
-    --border-color: var(--color-border);
-    --padding-start: 0;
-    --inner-padding-end: 0;
+  ion-list {
+    background: transparent;
   }
 
-  ion-badge {
-    font-size: 14px;
-    padding: 4px 8px;
-    background-color: var(--color-primary);
+  ion-item {
+    --background: transparent;
+    --padding-start: 0;
+    --inner-padding-end: 0;
+    --min-height: 60px;
+
+    &:not(:last-child) {
+      --border-color: rgba(var(--ion-color-medium-rgb), 0.2);
+      --border-style: dashed;
+      --border-width: 0 0 1px 0;
+    }
+
+    h2 {
+      font-weight: 600;
+      color: var(--color-text);
+      margin-bottom: 4px;
+    }
+
+    p {
+      color: var(--ion-color-medium);
+      font-size: 14px;
+    }
+
+    ion-badge {
+      font-size: 14px;
+      padding: 4px 8px;
+      border-radius: 12px;
+    }
   }
 }
 
@@ -75,31 +116,12 @@ ion-card {
     position: relative;
     height: 300px;
     width: 100%;
-    margin-bottom: 20px;
+    margin-top: 16px;
   }
 }
 
-.generate-report-btn {
-  margin-top: 20px;
-  --background: var(--color-button);
-  --box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-ion-list {
-  background: transparent;
-
-  ion-item {
-    --background: transparent;
-    --padding-start: 0;
-
-    h2 {
-      font-weight: bold;
-    }
-
-    p {
-      color: var(--ion-color-medium);
-    }
-  }
+ion-fab-button {
+  --box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
 @media (max-width: 768px) {
@@ -107,20 +129,14 @@ ion-list {
     font-size: 24px;
   }
 
-  .section-title {
-    font-size: 20px;
-  }
-
-  .total-amount {
-    font-size: 28px;
+  .dashboard-card {
+    .big-number {
+      font-size: 28px;
+    }
   }
 
   .chart-container {
-    position: relative;
-    height: 50vh;
-    width: 100%;
-    margin-bottom: 20px;
-    padding: 10px;
+    height: 250px;
   }
 }
 
@@ -129,52 +145,81 @@ ion-list {
     font-size: 22px;
   }
 
-  .section-title {
-    font-size: 18px;
-  }
-
-
-  .chart-container {
-    position: relative;
-    height: 50vh;
-    width: 100%;
-    margin-bottom: 20px;
-    padding: 10px;
-  }
-
   .dashboard-card {
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  
     ion-card-header {
-      background-color: var(--ion-color-light);
+      ion-card-title {
+        font-size: 16px;
+      }
     }
-  
-    ion-card-title {
-      font-size: 1.2rem;
-      font-weight: bold;
-    }
-  
+
     .big-number {
-      font-size: 2.5rem;
-      font-weight: bold;
-      color: var(--ion-color-primary);
-      margin: 10px 0;
-      text-align: center;
-  
-      &.danger {
-        color: var(--ion-color-danger);
+      font-size: 24px;
+    }
+  }
+
+  .top-products-card {
+    ion-item {
+      h2 {
+        font-size: 14px;
+      }
+
+      p {
+        font-size: 12px;
+      }
+
+      ion-badge {
+        font-size: 12px;
       }
     }
   }
 
-  canvas {
-    width: 100% !important;
-    height: 100% !important;
+  .weekly-sales-card {
+    .week-container {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+  
+      .day-card {
+        flex: 1;
+        min-width: calc(14% - 10px);
+        background-color: rgba(var(--ion-color-primary-rgb), 0.1);
+        border-radius: 10px;
+        padding: 10px;
+        text-align: center;
+        cursor: pointer;
+        transition: background-color 0.3s ease, transform 0.3s ease;
+  
+        &:hover {
+          background-color: rgba(var(--ion-color-primary-rgb), 0.2);
+          transform: translateY(-3px);
+        }
+  
+        h3 {
+          margin: 0;
+          font-size: 16px;
+          font-weight: 600;
+          color: var(--color-text);
+        }
+  
+        p {
+          margin: 5px 0 0;
+          font-size: 14px;
+          color: var(--color-primary);
+        }
+      }
+    }
   }
-  ion-fab-button {
-    --background: var(--ion-color-primary);
-    --color: var(--ion-color-light);
+  .day-details-card {
+    animation: fadeIn 0.3s ease-out;
+  }
+  .chart-container {
+    height: 200px;
   }
   
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
 }

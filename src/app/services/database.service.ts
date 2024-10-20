@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { SQLite, SQLiteObject } from '@awesome-cordova-plugins/sqlite/ngx';
 import { AlertController, Platform } from '@ionic/angular';
-import { BehaviorSubject, Observable, from } from 'rxjs';
+import { BehaviorSubject, Observable, from,throwError } from 'rxjs';
 import { map, catchError, switchMap } from 'rxjs/operators';
 import { User } from '../models/user.model';
 import { of, firstValueFrom, forkJoin } from 'rxjs';
@@ -9,6 +9,7 @@ import { Product } from '../models/product.model';
 import { Order } from '../models/order.model';
 import { OrderDetail } from '../models/order-detail.model';
 import { Plugins } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 const { Console } = Plugins;
 
 
@@ -76,21 +77,22 @@ export class DatabaseService {
     PhoneNumber TEXT,
     HireDate DATE,
     LastLogin DATETIME,
-    ApprovalStatus TEXT NOT NULL CHECK (ApprovalStatus IN ('pending', 'approved', 'rejected'))
+    ApprovalStatus TEXT NOT NULL CHECK (ApprovalStatus IN ('pending', 'approved', 'rejected')),
+    ProfilePicture TEXT
   );`;
 
   tableProducts: string = `
-    CREATE TABLE IF NOT EXISTS Products (
-      ProductID INTEGER PRIMARY KEY AUTOINCREMENT,
-      Name TEXT NOT NULL,
-      Description TEXT,
-      Price REAL NOT NULL,
-      Category TEXT NOT NULL,
-      ImageURL TEXT,
-      IsAvailable BOOLEAN DEFAULT 1,
-      CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-    );`;
+  CREATE TABLE IF NOT EXISTS Products (
+    ProductID INTEGER PRIMARY KEY AUTOINCREMENT,
+    Name TEXT NOT NULL UNIQUE,
+    Description TEXT,
+    Price REAL NOT NULL,
+    Category TEXT NOT NULL,
+    ImageURL TEXT,
+    IsAvailable BOOLEAN DEFAULT 1,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`;
 
   tableOrders: string = `
     CREATE TABLE IF NOT EXISTS Orders (
@@ -229,14 +231,34 @@ export class DatabaseService {
       throw error;
     }
   }
+
   getAllUsers(): Observable<User[]> {
     return from(this.database.executeSql('SELECT * FROM Users', [])).pipe(
       map(data => {
+        console.log('Resultado de la consulta SQL:', data);
         let users: User[] = [];
         for (let i = 0; i < data.rows.length; i++) {
-          users.push(data.rows.item(i));
+          const row = data.rows.item(i);
+          users.push({
+            UserID: row.UserID,
+            Username: row.Username,
+            Password: '', // No devolvemos la contraseña real por seguridad
+            Role: row.Role as 'employee' | 'admin' | 'manager',
+            Name: row.Name,
+            Email: row.Email,
+            PhoneNumber: row.PhoneNumber,
+            HireDate: row.HireDate ? new Date(row.HireDate) : undefined,
+            LastLogin: row.LastLogin ? new Date(row.LastLogin) : undefined,
+            ApprovalStatus: row.ApprovalStatus as 'pending' | 'approved' | 'rejected',
+            ProfilePicture: row.ProfilePicture || undefined
+          });
         }
+        console.log('Usuarios procesados:', users);
         return users;
+      }),
+      catchError(error => {
+        console.error('Error en getAllUsers:', error);
+        return throwError(() => new Error('Error al obtener usuarios: ' + error.message));
       })
     );
   }
@@ -416,6 +438,8 @@ export class DatabaseService {
         SUM(od.Quantity) as totalSold
       FROM OrderDetails od
       JOIN Products p ON od.ProductID = p.ProductID
+      JOIN Orders o ON od.OrderID = o.OrderID
+      WHERE o.Status != 'Cancelado'
       GROUP BY od.ProductID
       ORDER BY totalSold DESC
       LIMIT ?
@@ -499,6 +523,7 @@ export class DatabaseService {
     });
   }
 
+
   deleteProduct(id: number): Promise<boolean> | Observable<any> {
     return from(this.database.executeSql('DELETE FROM Products WHERE ProductID = ?', [id]))
       .pipe(
@@ -532,16 +557,14 @@ export class DatabaseService {
   }
   
 
-  deleteUser(id: number): Observable<boolean> {
-    return new Observable(observer => {
-      const sql = 'DELETE FROM Users WHERE UserID = ?';
-      this.database.executeSql(sql, [id])
-        .then(() => {
-          observer.next(true);
-          observer.complete();
-        })
-        .catch(e => observer.error(e));
-    });
+  deleteUser(userId: number): Observable<boolean> {
+    return from(this.database.executeSql('DELETE FROM Users WHERE UserID = ?', [userId])).pipe(
+      map(result => result.rowsAffected > 0),
+      catchError(error => {
+        console.error('Error deleting user:', error);
+        return of(false);
+      })
+    );
   }
 
   updateUserLastLogin(userId: number): Observable<boolean> {
@@ -694,6 +717,83 @@ insertSeedData(): Observable<boolean> {
       console.error('Error al obtener detalles del producto:', error);
       throw error;
     }
+  }
+
+  async updateUserProfilePicture(userId: number, profilePicture: string): Promise<boolean> {
+    const query = 'UPDATE Users SET ProfilePicture = ? WHERE UserID = ?';
+    try {
+      const result = await this.database.executeSql(query, [profilePicture, userId]);
+      console.log(`Foto de perfil actualizada para el usuario ${userId}`);
+      return result.rowsAffected > 0;
+    } catch (error) {
+      console.error('Error updating profile picture:', error);
+      return false;
+    }
+  }
+
+  getUserProfilePicture(userId: number): Observable<string | null> {
+    return from(this.database.executeSql('SELECT ProfilePicture FROM Users WHERE UserID = ?', [userId])).pipe(
+      map(data => {
+        if (data.rows.length > 0) {
+          const profilePicture = data.rows.item(0).ProfilePicture;
+          console.log(`Foto de perfil para usuario ${userId}:`, profilePicture);
+          return profilePicture;
+        }
+        return null;
+      }),
+      catchError(error => {
+        console.error(`Error al obtener la foto de perfil para el usuario ${userId}:`, error);
+        return of(null);
+      })
+    );
+  }
+
+  async saveProfilePicture(userId: number, imageData: string): Promise<string> {
+    const fileName = `profile_${userId}_${new Date().getTime()}.jpg`;
+    const savedFile = await Filesystem.writeFile({
+      path: fileName,
+      data: imageData,
+      directory: Directory.Data
+    });
+
+    // Guarda la ruta en la base de datos
+    await this.database.executeSql(
+      'UPDATE Users SET ProfilePicture = ? WHERE UserID = ?',
+      [savedFile.uri, userId]
+    );
+
+    return savedFile.uri;
+  }
+
+    async getProfilePicture(userId: number): Promise<string | null> {
+    const data = await this.database.executeSql(
+      'SELECT ProfilePicture FROM Users WHERE UserID = ?',
+      [userId]
+    );
+    if (data.rows.length > 0) {
+      const profilePicturePath = data.rows.item(0).ProfilePicture;
+      if (profilePicturePath) {
+        const readFile = await Filesystem.readFile({
+          path: profilePicturePath,
+          directory: Directory.Data
+        });
+        return `data:image/jpeg;base64,${readFile.data}`;
+      }
+    }
+    return null;
+  }
+
+
+  async removeDuplicateProducts() {
+    const query = `
+      DELETE FROM Products
+      WHERE ProductID NOT IN (
+        SELECT MIN(ProductID)
+        FROM Products
+        GROUP BY Name
+      )
+    `;
+    await this.database.executeSql(query, []);
   }
   
 }

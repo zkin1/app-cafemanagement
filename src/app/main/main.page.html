@@ -1,16 +1,9 @@
-<ion-header>
+<ion-header class="ion-no-border">
   <ion-toolbar>
     <ion-buttons slot="start">
       <ion-menu-button></ion-menu-button>
     </ion-buttons>
-    <ion-title>Menú - Orden #{{ currentOrderNumber || 'Nueva' }}</ion-title>
-    <ion-buttons slot="end">
-      <ion-button routerLink="/carro-compras">
-        <ion-icon name="cart-outline" aria-hidden="true"></ion-icon>
-        <ion-badge *ngIf="currentOrderItems && currentOrderItems.length > 0">{{ currentOrderItems.length }}</ion-badge>
-        <span class="sr-only">Carrito de compras</span>
-      </ion-button>
-    </ion-buttons>
+    <ion-title class="ion-text-center">Inicio</ion-title>
   </ion-toolbar>
 </ion-header>
 

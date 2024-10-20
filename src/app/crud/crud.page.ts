@@ -4,7 +4,9 @@ import { Product } from '../models/product.model';
 import { ToastController, LoadingController } from '@ionic/angular';
 import { Subscription, Observable, from, of, lastValueFrom} from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-crud',
@@ -37,6 +39,24 @@ export class CrudPage implements OnInit, OnDestroy {
     this.subscriptions.unsubscribe();
   }
 
+  async selectImage() {
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: true,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Photos
+      });
+
+      if (image.dataUrl) {
+        this.currentProduct.imageURL = image.dataUrl;
+      }
+    } catch (error) {
+      console.error('Error al seleccionar la imagen:', error);
+      this.presentToast('Error al seleccionar la imagen');
+    }
+  }
+
   async loadProducts() {
     const loading = await this.loadingController.create({
       message: 'Cargando productos...',
@@ -44,21 +64,21 @@ export class CrudPage implements OnInit, OnDestroy {
     await loading.present();
   
     try {
-      const products = await lastValueFrom(this.getAllProducts());
+      const products = await this.getAllProducts();
       console.log('Productos obtenidos de la base de datos:', products);
   
-      // Mapeamos los productos para asegurarnos de que tienen la estructura correcta
-      this.products = products.map(product => ({
-        id: product.id,
-        name: product.name,
-        description: product.description,
-        price: product.price,
-        category: product.category,
-        imageURL: product.imageURL.startsWith('assets/') ? product.imageURL : `assets/${product.imageURL}`,
-        isAvailable: product.isAvailable
+      // Eliminar duplicados basándose en el ID
+      const uniqueProducts = Array.from(new Map(products.map(item => [item.id, item])).values());
+  
+      this.products = uniqueProducts.map(product => ({
+        ...product,
+        imageURL: this.getImageUrl(product.imageURL),
+        showOptions: false,
+        selectedSize: 'medium',
+        selectedMilk: 'regular'
       }));
   
-      console.log('Productos procesados para CRUD:', this.products);
+      console.log('Productos procesados:', this.products);
     } catch (error) {
       console.error('Error al cargar los productos:', error);
       await this.presentToast('Error al cargar los productos. Por favor, intente de nuevo.');
@@ -66,20 +86,26 @@ export class CrudPage implements OnInit, OnDestroy {
       await loading.dismiss();
     }
   }
+  private getImageUrl(imageUri: string): string {
+    if (!imageUri) {
+      return 'assets/default-product-image.jpg';
+    }
+  
+    if (imageUri.startsWith('data:image') || imageUri.startsWith('assets/')) {
+      return imageUri;
+    }
+  
+    return `assets/${imageUri}`;
+  }
 
-  private getAllProducts(): Observable<Product[]> {
-    return this.databaseService.getAllProducts().pipe(
-      map(products => {
-        // Asegúrate de que cada producto tenga un ID único
-        return products.filter((product, index, self) =>
-          index === self.findIndex((t) => t.id === product.id)
-        );
-      }),
+
+  private getAllProducts(): Promise<Product[]> {
+    return firstValueFrom(this.databaseService.getAllProducts().pipe(
       catchError(error => {
         console.error('Error al obtener productos:', error);
         return of([]);
       })
-    );
+    ));
   }
   
   async addProduct() {
@@ -87,8 +113,13 @@ export class CrudPage implements OnInit, OnDestroy {
       message: 'Agregando producto...',
     });
     await loading.present();
-
+  
     try {
+      if (this.currentProduct.imageURL && this.currentProduct.imageURL.startsWith('data:image')) {
+        const fileName = `product_${new Date().getTime()}.jpeg`;
+        this.currentProduct.imageURL = await this.saveImage(this.currentProduct.imageURL, fileName);
+      }
+  
       const newProductId = await this.createProduct(this.currentProduct);
       if (newProductId !== undefined) {
         this.currentProduct.id = newProductId;
@@ -105,6 +136,9 @@ export class CrudPage implements OnInit, OnDestroy {
       await loading.dismiss();
     }
   }
+  
+
+  
 
   private createProduct(product: Product): Promise<number | undefined> {
     const result = this.databaseService.createProduct(product);
@@ -114,13 +148,19 @@ export class CrudPage implements OnInit, OnDestroy {
     return result;
   }
 
+
   async updateProduct() {
     const loading = await this.loadingController.create({
       message: 'Actualizando producto...',
     });
     await loading.present();
-
+  
     try {
+      if (this.currentProduct.imageURL && this.currentProduct.imageURL.startsWith('data:image')) {
+        const fileName = `product_${this.currentProduct.id}_${new Date().getTime()}.jpeg`;
+        this.currentProduct.imageURL = await this.saveImage(this.currentProduct.imageURL, fileName);
+      }
+  
       const success = await this.updateProductInDb(this.currentProduct);
       if (success) {
         const index = this.products.findIndex(p => p.id === this.currentProduct.id);
@@ -137,6 +177,26 @@ export class CrudPage implements OnInit, OnDestroy {
       this.presentToast('Error al actualizar el producto');
     } finally {
       await loading.dismiss();
+    }
+  }
+
+  private async saveImage(imageDataUrl: string, fileName: string): Promise<string> {
+    try {
+      // Extraer la base64 del Data URL
+      const base64Data = imageDataUrl.split(',')[1];
+  
+      // Guardar el archivo en el directorio de datos de la aplicación
+      const savedFile = await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: Directory.Data
+      });
+  
+      // Devolver la ruta completa del archivo guardado
+      return savedFile.uri;
+    } catch (error) {
+      console.error('Error al guardar la imagen:', error);
+      throw new Error('No se pudo guardar la imagen');
     }
   }
 

@@ -1,44 +1,58 @@
-<ion-header>
+<ion-header class="ion-no-border">
   <ion-toolbar color="primary">
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/"></ion-back-button>
+      <ion-menu-button></ion-menu-button>
     </ion-buttons>
-    <ion-title>Mi Perfil</ion-title>
+    <ion-title class="ion-text-center">Mi Perfil</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding">
+  <div class="profile-picture-container">
+    <img [src]="profilePicture || 'assets/default-avatar.png'" 
+     (error)="handleImageError($event)" 
+     alt="Foto de perfil" 
+     class="profile-picture">
+    <ion-button (click)="takePicture()" expand="block" fill="outline">
+      <ion-icon name="camera-outline" slot="start"></ion-icon>
+      Cambiar foto
+    </ion-button>
+  </div>
+
   <ion-card>
     <ion-card-header>
       <ion-card-title>
-        <ion-icon name="person-circle-outline" class="ion-margin-end"></ion-icon>
+        <ion-icon name="person-circle-outline"></ion-icon>
         Información Personal
       </ion-card-title>
     </ion-card-header>
     <ion-card-content>
       <form (ngSubmit)="updatePerfil()" #perfilForm="ngForm">
         <ion-item>
-          <ion-label position="floating">Nombre</ion-label>
-          <ion-input [(ngModel)]="usuario.Name" name="name" required #name="ngModel"></ion-input>
+          <ion-label position="stacked">Nombre</ion-label>
+          <ion-input [(ngModel)]="usuario.Name" name="name" required #name="ngModel" placeholder="Ingrese su nombre"></ion-input>
         </ion-item>
         <ion-text color="danger" *ngIf="name.invalid && (name.dirty || name.touched)">
           <small>El nombre es requerido</small>
         </ion-text>
 
         <ion-item>
-          <ion-label position="floating">Email</ion-label>
-          <ion-input [(ngModel)]="usuario.Email" name="email" type="email" required #email="ngModel" pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$"></ion-input>
+          <ion-label position="stacked">Email</ion-label>
+          <ion-input [(ngModel)]="usuario.Email" name="email" type="email" required #email="ngModel" pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$" placeholder="Ingrese su email"></ion-input>
         </ion-item>
         <ion-text color="danger" *ngIf="email.invalid && (email.dirty || email.touched)">
           <small>Por favor, ingrese un email válido</small>
         </ion-text>
 
         <ion-item>
-          <ion-label position="floating">Rol</ion-label>
+          <ion-label position="stacked">Rol</ion-label>
           <ion-input [value]="usuario.Role === 'admin' ? 'Administrador' : 'Empleado'" readonly></ion-input>
         </ion-item>
 
-        <ion-button expand="block" type="submit" class="ion-margin-top" [disabled]="!perfilForm.form.valid">Actualizar Perfil</ion-button>
+        <ion-button expand="block" type="submit" [disabled]="!perfilForm.form.valid">
+          <ion-icon name="save-outline" slot="start"></ion-icon>
+          Actualizar Perfil
+        </ion-button>
       </form>
     </ion-card-content>
   </ion-card>
@@ -46,44 +60,45 @@
   <ion-card>
     <ion-card-header>
       <ion-card-title>
-        <ion-icon name="lock-closed-outline" class="ion-margin-end"></ion-icon>
+        <ion-icon name="lock-closed-outline"></ion-icon>
         Cambiar Contraseña
       </ion-card-title>
     </ion-card-header>
     <ion-card-content>
       <form (ngSubmit)="cambiarContrasena()" #passwordForm="ngForm">
         <ion-item>
-          <ion-label position="floating">Contraseña Actual</ion-label>
-          <ion-input [(ngModel)]="datosContrasena.contrasenaActual" name="contrasenaActual" type="password" required #contrasenaActual="ngModel"></ion-input>
+          <ion-label position="stacked">Contraseña Actual</ion-label>
+          <ion-input [(ngModel)]="datosContrasena.contrasenaActual" name="contrasenaActual" type="password" required #contrasenaActual="ngModel" placeholder="Ingrese su contraseña actual"></ion-input>
         </ion-item>
         <ion-text color="danger" *ngIf="contrasenaActual.invalid && (contrasenaActual.dirty || contrasenaActual.touched)">
           <small>La contraseña actual es requerida</small>
         </ion-text>
 
         <ion-item>
-          <ion-label position="floating">Nueva Contraseña</ion-label>
-          <ion-input [(ngModel)]="datosContrasena.nuevaContrasena" name="nuevaContrasena" type="password" required minlength="8" #nuevaContrasena="ngModel"></ion-input>
+          <ion-label position="stacked">Nueva Contraseña</ion-label>
+          <ion-input [(ngModel)]="datosContrasena.nuevaContrasena" name="nuevaContrasena" type="password" required minlength="8" #nuevaContrasena="ngModel" placeholder="Ingrese su nueva contraseña"></ion-input>
         </ion-item>
         <ion-text color="danger" *ngIf="nuevaContrasena.invalid && (nuevaContrasena.dirty || nuevaContrasena.touched)">
           <small>La nueva contraseña debe tener al menos 8 caracteres</small>
         </ion-text>
 
         <ion-item>
-          <ion-label position="floating">Confirmar Nueva Contraseña</ion-label>
-          <ion-input [(ngModel)]="datosContrasena.confirmarContrasena" name="confirmarContrasena" type="password" required #confirmarContrasena="ngModel"></ion-input>
+          <ion-label position="stacked">Confirmar Nueva Contraseña</ion-label>
+          <ion-input [(ngModel)]="datosContrasena.confirmarContrasena" name="confirmarContrasena" type="password" required #confirmarContrasena="ngModel" placeholder="Confirme su nueva contraseña"></ion-input>
         </ion-item>
         <ion-text color="danger" *ngIf="nuevaContrasena.value !== confirmarContrasena.value && (confirmarContrasena.dirty || confirmarContrasena.touched)">
           <small>Las contraseñas no coinciden</small>
         </ion-text>
 
-        <ion-button expand="block" type="submit" class="ion-margin-top" [disabled]="!passwordForm.form.valid || nuevaContrasena.value !== confirmarContrasena.value">
+        <ion-button expand="block" type="submit" [disabled]="!passwordForm.form.valid || nuevaContrasena.value !== confirmarContrasena.value">
+          <ion-icon name="key-outline" slot="start"></ion-icon>
           Cambiar Contraseña
         </ion-button>
       </form>
     </ion-card-content>
   </ion-card>
 
-  <ion-button expand="block" (click)="logout()" color="danger" class="ion-margin-top">
+  <ion-button expand="block" (click)="logout()" color="danger" class="logout-button">
     <ion-icon name="log-out-outline" slot="start"></ion-icon>
     Cerrar Sesión
   </ion-button>
@@ -94,5 +109,5 @@
   [message]="toastMessage"
   [duration]="3000"
   position="top"
-  color="success">
+  [color]="toastColor">
 </ion-toast>

@@ -2,9 +2,10 @@ import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { NgForm } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ToastController, LoadingController, AlertController } from '@ionic/angular';
-import { Subscription, Observable } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { DatabaseService } from '../services/database.service';
 import { User } from '../models/user.model';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 @Component({
   selector: 'app-perfil',
@@ -14,9 +15,10 @@ import { User } from '../models/user.model';
 export class PerfilPage implements OnInit, OnDestroy {
   @ViewChild('perfilForm') perfilForm!: NgForm;
   @ViewChild('passwordForm') passwordForm!: NgForm;
-
+  toastColor: string = 'success';
   showToast: boolean = false;
   toastMessage: string = '';
+  profilePicture: string | null = null;
   
   usuario: User = {
     UserID: 0,
@@ -50,6 +52,8 @@ export class PerfilPage implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.cargarPerfilUsuario();
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    this.profilePicture = currentUser.profilePicture || null;
   }
 
   ngOnDestroy() {
@@ -70,6 +74,7 @@ export class PerfilPage implements OnInit, OnDestroy {
   
       this.usuario = await this.getUserById(userId);
       this.esAdmin = this.usuario.Role === 'admin';
+      await this.loadProfilePicture(userId);
       
       console.log('Usuario cargado:', this.usuario);
       console.log('Es admin:', this.esAdmin);
@@ -95,6 +100,41 @@ export class PerfilPage implements OnInit, OnDestroy {
         (error) => reject(error)
       );
     });
+  }
+
+  async loadProfilePicture(userId: number) {
+    try {
+      const result = await this.databaseService.getUserProfilePicture(userId).toPromise();
+      this.profilePicture = result !== undefined ? result : null;
+    } catch (error) {
+      console.error('Error loading profile picture:', error);
+      this.profilePicture = null;
+    }
+  }
+
+  async takePicture() {
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: true,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Prompt
+      });
+  
+      this.profilePicture = image.dataUrl || null;
+      const userId = this.obtenerIdUsuarioActual();
+      if (userId && this.profilePicture) {
+        await this.databaseService.updateUserProfilePicture(userId, this.profilePicture);
+        // Actualizar el localStorage con la nueva imagen
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        currentUser.profilePicture = this.profilePicture;
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        await this.presentToast('Foto de perfil actualizada con éxito');
+      }
+    } catch (error) {
+      console.error('Error taking picture:', error);
+      await this.presentToast('Error al tomar la foto');
+    }
   }
 
   async updatePerfil() {
@@ -244,5 +284,9 @@ export class PerfilPage implements OnInit, OnDestroy {
     });
 
     await alert.present();
+  }
+
+  handleImageError(event: any) {
+    event.target.src = 'assets/default-avatar.png';
   }
 }

@@ -12,13 +12,29 @@ export class AuthGuard implements CanActivate {
     next: ActivatedRouteSnapshot,
     state: RouterStateSnapshot): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
     
-    if (localStorage.getItem('currentUser')) {
-      // Usuario autenticado, permite el acceso
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    
+    if (currentUser && currentUser.id) {
+      // Usuario autenticado
+      if (state.url === '/login' || state.url === '/') {
+        // Si el usuario intenta acceder a la página de login o la raíz estando autenticado
+        if (currentUser.role === 'admin') {
+          this.router.navigate(['/admin-dashboard']);
+        } else {
+          this.router.navigate(['/employee-dashboard']);
+        }
+        return false;
+      }
       return true;
     }
 
-    // Usuario no autenticado, redirige al login
-    this.router.navigate(['/login'], { queryParams: { returnUrl: state.url }});
-    return false;
+    // Usuario no autenticado
+    if (state.url !== '/login' && state.url !== '/register') {
+      // Si el usuario no está autenticado y trata de acceder a una página protegida
+      this.router.navigate(['/login']);
+      return false;
+    }
+
+    return true;
   }
 }

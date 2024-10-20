@@ -4,6 +4,7 @@ import { DatabaseService } from '../services/database.service';
 import { ToastController } from '@ionic/angular';
 import { User } from '../models/user.model';
 import { firstValueFrom } from 'rxjs';
+
 @Component({
   selector: 'app-login',
   templateUrl: './login.page.html',
@@ -23,6 +24,25 @@ export class LoginPage {
     private toastController: ToastController
   ) {}
 
+  ngOnInit() {
+    this.checkAuthAndRedirect();
+  }
+
+  private checkAuthAndRedirect() {
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    if (currentUser && currentUser.id) {
+      console.log('Usuario autenticado:', currentUser);
+      if (currentUser.role === 'admin') {
+        this.router.navigate(['/admin-dashboard']);
+      } else {
+        this.router.navigate(['/employee-dashboard']);
+      }
+    } else {
+      console.log('Usuario no autenticado');
+      this.router.navigate(['/login']);
+    }
+  }
+
   async onSubmit() {
     console.log('Iniciando proceso de login');
     if (!this.email || !this.password) {
@@ -37,7 +57,26 @@ export class LoginPage {
       
       if (user) {
         if (user.ApprovalStatus === 'approved') {
-          await this.handleSuccessfulLogin(user);
+          // Guardar información del usuario en el almacenamiento local
+          const userInfo = {
+            id: user.UserID,
+            name: user.Name,
+            email: user.Email,
+            role: user.Role
+          };
+          localStorage.setItem('currentUser', JSON.stringify(userInfo));
+  
+          // Actualizar la fecha del último login
+          await this.databaseService.updateUserLastLogin(user.UserID!);
+  
+          // Redireccionar basado en el rol
+          if (user.Role === 'admin') {
+            this.router.navigate(['/admin-dashboard']);
+          } else {
+            this.router.navigate(['/employee-dashboard']);
+          }
+  
+          await this.presentToast(`Bienvenido, ${user.Name}!`);
         } else if (user.ApprovalStatus === 'pending') {
           await this.presentToast('Su cuenta está pendiente de aprobación. Por favor, espere la confirmación del administrador.');
         } else {

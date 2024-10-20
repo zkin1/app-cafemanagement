@@ -1,24 +1,66 @@
-<ion-header>
-  <ion-toolbar>
-    <ion-title>Dashboard de Empleado</ion-title>
+<ion-header class="ion-no-border">
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title class="ion-text-center">Dashboard de Empleado</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding">
-  <h2>Bienvenido, {{ employeeName }}</h2>
+  <div class="welcome-section">
+    <ion-avatar>
+      <img [src]="profilePicture || 'assets/default-avatar.png'" 
+     (error)="handleImageError($event)" 
+     alt="Foto de perfil" 
+     class="profile-picture">
+    </ion-avatar>
+    <h2>Bienvenido, {{ employeeName }}</h2>
+  </div>
   
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Tu Resumen</ion-card-title>
-    </ion-card-header>
-    <ion-card-content>
-      <p>Ordenes tomadas hoy: {{ ordersToday }}</p>
-      <p>Ordenes pendientes: {{ pendingOrders }}</p>
-    </ion-card-content>
-  </ion-card>
+  <ion-grid>
+    <ion-row>
+      <ion-col size="12" size-md="6">
+        <ion-card class="dashboard-card">
+          <ion-card-header>
+            <ion-icon name="today-outline" color="primary"></ion-icon>
+            <ion-card-title>Órdenes de Hoy</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <h3>{{ ordersToday }}</h3>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+      <ion-col size="12" size-md="6">
+        <ion-card class="dashboard-card">
+          <ion-card-header>
+            <ion-icon name="hourglass-outline" color="warning"></ion-icon>
+            <ion-card-title>Órdenes Pendientes</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <h3>{{ pendingOrders }}</h3>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
 
-  <ion-button expand="block" routerLink="/main">Tomar Nueva Orden</ion-button>
-  <ion-button expand="block" routerLink="/comandas">Ver Órdenes Actuales</ion-button>
-  <ion-button expand="block" routerLink="/perfil">Mi Perfil</ion-button>
-  <ion-button expand="block" (click)="logout()">Cerrar Sesión</ion-button>
+  <div class="action-buttons">
+    <ion-button expand="block" routerLink="/main" class="main-action">
+      <ion-icon name="add-circle-outline" slot="start"></ion-icon>
+      Tomar Nueva Orden
+    </ion-button>
+    <ion-button expand="block" routerLink="/comandas" color="secondary">
+      <ion-icon name="list-outline" slot="start"></ion-icon>
+      Ver Órdenes Actuales
+    </ion-button>
+    <ion-button expand="block" routerLink="/perfil" color="tertiary">
+      <ion-icon name="person-outline" slot="start"></ion-icon>
+      Mi Perfil
+    </ion-button>
+    <ion-button expand="block" (click)="logout()" color="danger">
+      <ion-icon name="log-out-outline" slot="start"></ion-icon>
+      Cerrar Sesión
+    </ion-button>
+  </div>
 </ion-content>

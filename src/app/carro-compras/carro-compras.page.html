@@ -1,27 +1,36 @@
-<ion-header>
+<ion-header class="ion-no-border">
   <ion-toolbar>
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/main"></ion-back-button>
+      <ion-menu-button></ion-menu-button>
     </ion-buttons>
-    <ion-title>Orden #{{ currentOrder.orderNumber }}</ion-title>
+    <ion-title class="ion-text-center">Orden #{{ currentOrder.orderNumber }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding">
-  <h1>Resumen de la Orden</h1>
+  <h1 class="order-summary-title">Resumen de la Orden</h1>
   
   <ion-list class="cart-items">
-    <ion-item *ngFor="let item of currentOrder.items">
-      <ion-thumbnail slot="start">
-        <img [src]="item.image" [alt]="item.name">
-      </ion-thumbnail>
-      <ion-label>
-        <h2>{{ item.name }}</h2>
-        <p>{{ item.selectedSize }}, leche de {{ item.selectedMilk }}</p>
-        <p>Cantidad: {{ item.quantity }}</p>
-      </ion-label>
-      <ion-note slot="end" color="primary">${{ (item.finalPrice * item.quantity).toFixed(0) }}</ion-note>
-    </ion-item>
+    <ion-item-sliding *ngFor="let item of currentOrder.items">
+      <ion-item lines="none">
+        <ion-thumbnail slot="start">
+          <img [src]="item.image" [alt]="item.name">
+        </ion-thumbnail>
+        <ion-label>
+          <h2>{{ item.name }}</h2>
+          <p>{{ item.selectedSize }}, leche de {{ item.selectedMilk }}</p>
+          <ion-badge color="primary" mode="ios">{{ item.quantity }}</ion-badge>
+        </ion-label>
+        <ion-note slot="end" color="primary">
+          ${{ (item.finalPrice * item.quantity).toFixed(0) }}
+        </ion-note>
+      </ion-item>
+      <ion-item-options side="end">
+        <ion-item-option color="danger" (click)="removeItem(item)">
+          <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+        </ion-item-option>
+      </ion-item-options>
+    </ion-item-sliding>
   </ion-list>
   
   <div class="order-details">
@@ -32,21 +41,25 @@
     
     <ion-item>
       <ion-label position="floating">Nota</ion-label>
-      <ion-textarea [(ngModel)]="currentOrder.notes"></ion-textarea>
+      <ion-textarea [(ngModel)]="currentOrder.notes" rows="3"></ion-textarea>
     </ion-item>
 
-    <ion-item class="totalAmount">
+    <ion-item class="total-amount">
       <ion-label>
         <h2>Total</h2>
       </ion-label>
-      <ion-note slot="end" color="primary">${{ calculateTotal().toFixed(0) }}</ion-note>
+      <ion-note slot="end" color="primary">
+        ${{ calculateTotal().toFixed(0) }}
+      </ion-note>
     </ion-item>
   </div>
 </ion-content>
 
-<ion-footer>
+<ion-footer class="ion-no-border">
   <ion-toolbar>
-    <ion-button expand="block" (click)="confirmarOrden()">Confirmar Orden</ion-button>
+    <ion-button expand="block" (click)="confirmarOrden()" [disabled]="currentOrder.items.length === 0">
+      Confirmar Orden
+    </ion-button>
   </ion-toolbar>
 </ion-footer>
 

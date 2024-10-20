@@ -9,23 +9,14 @@ import { Subscription } from 'rxjs';
 import { Capacitor, Plugins } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { App } from '@capacitor/app';
+import { DailySale } from '../models/daily-sale.model';
+import { TopProduct } from '../models/top-product.model';
 
 const { Permissions } = Plugins;
 const { Share } = Plugins;
 
 // Configuración de pdfMake
 (pdfMake as any).vfs = pdfFonts.pdfMake.vfs;
-
-interface DailySale {
-  day: string;
-  amount: number;
-  canceledAmount: number;
-}
-
-interface TopProduct {
-  name: string;
-  sales: number;
-}
 
 @Component({
   selector: 'app-admin',
@@ -37,11 +28,17 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
   private chart: Chart | undefined;
   totalSales: number = 0;
   topProducts: TopProduct[] = [];
-  dailySales: { day: string; amount: number; canceledAmount: number }[] = [];
+  selectedDay: DailySale | null = null;
+  dailySales: DailySale[] = [];
   private subscriptions: Subscription = new Subscription();
 
   ventasRealizadas: number = 0;
   ventasCanceladas: number = 0;
+
+  ordenesCancel = {
+    cantidad: 0,
+    total: 0
+  };
 
   constructor(
     private databaseService: DatabaseService,
@@ -70,6 +67,10 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  showDayDetails(day: DailySale) {
+    this.selectedDay = day;
+  }
+
   async loadStatistics() {
     const loading = await this.loadingController.create({
       message: 'Cargando estadísticas...',
@@ -79,18 +80,12 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
     try {
       const endDate = new Date();
       const startDate = new Date(endDate);
-      startDate.setDate(startDate.getDate() - 7); // Últimos 7 días
+      startDate.setDate(startDate.getDate() - 6); // Últimos 7 días
   
-      this.ventasRealizadas = await this.databaseService.calculateTotalSales(
+      this.totalSales = await this.databaseService.calculateTotalSales(
         startDate.toISOString().split('T')[0],
         endDate.toISOString().split('T')[0],
         ['Solicitado', 'En proceso', 'Listo', 'Entregado']
-      );
-  
-      this.ventasCanceladas = await this.databaseService.calculateTotalSales(
-        startDate.toISOString().split('T')[0],
-        endDate.toISOString().split('T')[0],
-        ['Cancelado']
       );
   
       this.ordenesCancel = {
@@ -102,19 +97,26 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
         )
       };
   
-      const [topSellingProducts, dailySales] = await Promise.all([
-        this.databaseService.getTopSellingProducts(5),
-        this.getDailySales(startDate, endDate)
-      ]);
-  
-      this.totalSales = this.ventasRealizadas;
-      this.topProducts = topSellingProducts.map(p => ({
-        name: p.name,
-        sales: p.totalSold
+      const topProductsData = await this.databaseService.getTopSellingProducts(5);
+      this.topProducts = topProductsData.map(product => ({
+        productId: product.productId,
+        name: product.name,
+        totalSold: product.totalSold,
+        sales: product.totalSold 
       }));
-      this.dailySales = dailySales;
   
-      this.createChart();
+      this.dailySales = await this.getDailySales(startDate, endDate);
+  
+      const today = new Date().getDay();
+      this.selectedDay = this.dailySales[today];
+  
+      console.log('Estadísticas cargadas:', {
+        totalSales: this.totalSales,
+        ordenesCancel: this.ordenesCancel,
+        topProducts: this.topProducts,
+        dailySales: this.dailySales
+      });
+  
     } catch (error) {
       console.error('Error al cargar estadísticas:', error);
       this.presentToast('Error al cargar estadísticas. Por favor, intente de nuevo.');
@@ -122,7 +124,7 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
       await loading.dismiss();
     }
   }
-
+  
   private createChart() {
     if (this.chart) {
       this.chart.destroy();
@@ -137,26 +139,6 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
       console.error('Unable to get 2D context for canvas');
       return;
     }
-  
-    const data = {
-      labels: this.dailySales.map(sale => sale.day),
-      datasets: [
-        {
-          label: 'Ventas Realizadas',
-          data: this.dailySales.map(sale => sale.amount),
-          backgroundColor: 'rgba(75, 192, 192, 0.6)',
-          borderColor: 'rgba(75, 192, 192, 1)',
-          borderWidth: 1
-        },
-        {
-          label: 'Ventas Canceladas',
-          data: this.dailySales.map(sale => sale.canceledAmount),
-          backgroundColor: 'rgba(255, 99, 132, 0.6)',
-          borderColor: 'rgba(255, 99, 132, 1)',
-          borderWidth: 1
-        }
-      ]
-    };
   
     const config: ChartConfiguration = {
       type: 'line', 
@@ -257,6 +239,7 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
       
       dailySales.push({
         day: daysOfWeek[currentDate.getDay()],
+        date: new Date(currentDate),
         amount: dayTotal,
         canceledAmount: canceledTotal
       });
@@ -307,10 +290,10 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
     });
     await alert.present();
   }
+
   async generateReport() {
     if (Capacitor.isNativePlatform()) {
       try {
-        // Intentamos escribir un archivo de prueba para verificar los permisos
         await Filesystem.writeFile({
           path: 'test.txt',
           data: 'This is a test',
@@ -318,7 +301,6 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
           encoding: Encoding.UTF8
         });
   
-        // Si llegamos aquí, tenemos permisos. Eliminamos el archivo de prueba.
         await Filesystem.deleteFile({
           path: 'test.txt',
           directory: Directory.Documents
@@ -417,7 +399,6 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
           }
         });
       } else {
-        // Para navegadores web
         pdfDocGenerator.download(`informe_ventas_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}.pdf`);
         await this.presentToast('Informe generado y descargado con éxito');
       }
@@ -453,10 +434,7 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
       await alert.present();
     });
   }
-
-
-
-
+  
   async requestStoragePermission() {
     if (Capacitor.isNativePlatform()) {
       try {
@@ -473,8 +451,11 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
     }
     return true;
   }
-  ordenesCancel = {
-    cantidad: 0,
-    total: 0
-  };
+
+  selectCancelOrders(): number {
+    if (this.selectedDay) {
+      return Math.round(this.selectedDay.canceledAmount);
+    }
+    return 0;
+  }
 }

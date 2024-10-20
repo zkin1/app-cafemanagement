@@ -9,4 +9,5 @@ export interface User {
   HireDate?: Date;
   LastLogin?: Date;
   ApprovalStatus: 'pending' | 'approved' | 'rejected';
+  ProfilePicture?: string | null;
 }

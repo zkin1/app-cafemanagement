@@ -10,8 +10,11 @@ import { DatabaseService } from '../services/database.service';
 })
 export class EmployeeDashboardPage implements OnInit {
   employeeName: string = 'Empleado';
+  employeeProfilePicture: string | null = null;
   ordersToday: number = 0;
   pendingOrders: number = 0;
+  profilePicture: string | null = null;
+
 
   constructor(
     private router: Router,
@@ -22,6 +25,8 @@ export class EmployeeDashboardPage implements OnInit {
 
   ngOnInit() {
     this.loadEmployeeData();
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    this.profilePicture = currentUser.profilePicture || null;
   }
 
   async loadEmployeeData() {
@@ -34,17 +39,31 @@ export class EmployeeDashboardPage implements OnInit {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       this.employeeName = currentUser.name || 'Empleado';
   
+      // Cargar la foto de perfil
+      if (currentUser.id) {
+        try {
+          const profilePicture = await this.databaseService.getUserProfilePicture(currentUser.id).toPromise();
+          this.employeeProfilePicture = profilePicture !== undefined ? profilePicture : null;
+          console.log('Foto de perfil cargada:', this.employeeProfilePicture);
+        } catch (error) {
+          console.error('Error al cargar la foto de perfil:', error);
+          this.employeeProfilePicture = null;
+        }
+      }
+  
       // Obtener el número real de órdenes del día
       this.ordersToday = await this.databaseService.getOrderCountForToday();
+      console.log('Número de órdenes del día:', this.ordersToday);
   
       // Obtener el número real de órdenes pendientes
       this.pendingOrders = await this.databaseService.getOrdersCount(['Solicitado', 'En proceso']);
+      console.log('Número de órdenes pendientes:', this.pendingOrders);
   
     } catch (error) {
       console.error('Error al cargar datos del dashboard:', error);
       this.presentToast('Error al cargar datos. Por favor, intente de nuevo.');
     } finally {
-      loading.dismiss();
+      await loading.dismiss();
     }
   }
 
@@ -60,5 +79,9 @@ export class EmployeeDashboardPage implements OnInit {
       position: 'bottom'
     });
     toast.present();
+  }
+
+  handleImageError(event: any) {
+    event.target.src = 'assets/default-avatar.png';
   }
 }
