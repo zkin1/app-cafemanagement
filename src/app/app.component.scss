@@ -19,48 +19,46 @@ ion-menu {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 30px 0;
+    padding: 20px 0;
     background-color: var(--ion-color-primary);
   }
 
   .company-logo {
-    width: 120px;
-    height: 120px;
+    width: 80px;
+    height: 80px;
     object-fit: contain;
-    margin-bottom: 15px;
-    border-radius: 60px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    margin-bottom: 10px;
+    border-radius: 50%;
+    background-color: white;
+    padding: 5px;
   }
 
   .company-name {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: bold;
     color: var(--ion-color-light);
     margin: 0;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
   }
 
   ion-list {
     background: transparent;
-    padding-top: 20px;
+    padding-top: 10px;
   }
 
   ion-note {
     color: var(--ion-color-dark);
-    font-size: 16px;
-    margin: 20px 0;
-    padding: 0 20px;
+    font-size: 14px;
+    margin: 10px 0;
+    padding: 0 16px;
   }
 
   ion-item {
     --background: transparent;
     --color: var(--ion-color-dark);
-    --padding-start: 20px;
-    --padding-end: 20px;
-    --min-height: 55px;
-    margin-bottom: 8px;
-    border-radius: 0 28px 28px 0;
-    transition: all 0.3s ease;
+    --padding-start: 16px;
+    --padding-end: 16px;
+    --min-height: 50px;
+    margin-bottom: 4px;
 
     &.selected, &:hover {
       --background: rgba(132, 176, 162, 0.2);
@@ -70,14 +68,13 @@ ion-menu {
 
   ion-icon {
     color: var(--ion-color-dark);
-    margin-right: 20px;
-    font-size: 24px;
-    transition: color 0.3s ease;
+    margin-right: 16px;
+    font-size: 20px;
   }
 
   ion-label {
-    font-size: 18px;
-    font-weight: 500;
+    font-size: 16px;
+    font-weight: 400;
   }
 
   ion-menu-toggle ion-item:hover ion-icon {
@@ -91,27 +88,28 @@ ion-menu {
   }
 
   .company-logo {
-    width: 100px;
-    height: 100px;
+    width: 60px;
+    height: 60px;
   }
 
   .company-name {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   ion-item {
-    --min-height: 50px;
+    --min-height: 45px;
   }
 
   ion-label {
-    font-size: 16px;
+    font-size: 14px;
   }
 }
 
+// Mantén las animaciones si lo deseas
 @keyframes fadeInLeft {
   from {
     opacity: 0;
-    transform: translate3d(-30px, 0, 0);
+    transform: translate3d(-20px, 0, 0);
   }
   to {
     opacity: 1;
@@ -120,12 +118,12 @@ ion-menu {
 }
 
 ion-menu-toggle ion-item {
-  animation: fadeInLeft 0.5s ease-out;
+  animation: fadeInLeft 0.3s ease-out;
   animation-fill-mode: both;
 }
 
-ion-menu-toggle ion-item:nth-child(1) { animation-delay: 0.1s; }
-ion-menu-toggle ion-item:nth-child(2) { animation-delay: 0.2s; }
-ion-menu-toggle ion-item:nth-child(3) { animation-delay: 0.3s; }
-ion-menu-toggle ion-item:nth-child(4) { animation-delay: 0.4s; }
-ion-menu-toggle ion-item:nth-child(5) { animation-delay: 0.5s; }
+ion-menu-toggle ion-item:nth-child(1) { animation-delay: 0.05s; }
+ion-menu-toggle ion-item:nth-child(2) { animation-delay: 0.1s; }
+ion-menu-toggle ion-item:nth-child(3) { animation-delay: 0.15s; }
+ion-menu-toggle ion-item:nth-child(4) { animation-delay: 0.2s; }
+ion-menu-toggle ion-item:nth-child(5) { animation-delay: 0.25s; }

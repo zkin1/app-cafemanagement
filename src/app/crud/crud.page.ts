@@ -67,10 +67,7 @@ export class CrudPage implements OnInit, OnDestroy {
       const products = await this.getAllProducts();
       console.log('Productos obtenidos de la base de datos:', products);
   
-      // Eliminar duplicados basándose en el ID
-      const uniqueProducts = Array.from(new Map(products.map(item => [item.id, item])).values());
-  
-      this.products = uniqueProducts.map(product => ({
+      this.products = products.map(product => ({
         ...product,
         imageURL: this.getImageUrl(product.imageURL),
         showOptions: false,
@@ -86,6 +83,7 @@ export class CrudPage implements OnInit, OnDestroy {
       await loading.dismiss();
     }
   }
+
   private getImageUrl(imageUri: string): string {
     if (!imageUri) {
       return 'assets/default-product-image.jpg';
@@ -126,6 +124,7 @@ export class CrudPage implements OnInit, OnDestroy {
         this.products.push({ ...this.currentProduct });
         this.presentToast('Producto agregado con éxito');
         this.resetForm();
+        await this.loadProducts();
       } else {
         throw new Error('No se pudo crear el producto');
       }
@@ -150,6 +149,11 @@ export class CrudPage implements OnInit, OnDestroy {
 
 
   async updateProduct() {
+    if (this.currentProduct.price < 0) {
+      this.presentToast('El precio debe ser mayor o igual a 0');
+      return;
+    }
+  
     const loading = await this.loadingController.create({
       message: 'Actualizando producto...',
     });
@@ -173,13 +177,12 @@ export class CrudPage implements OnInit, OnDestroy {
         throw new Error('No se pudo actualizar el producto');
       }
     } catch (error) {
-      console.error('Error updating product:', error);
+      console.error('Error al actualizar el producto:', error);
       this.presentToast('Error al actualizar el producto');
     } finally {
       await loading.dismiss();
     }
   }
-
   private async saveImage(imageDataUrl: string, fileName: string): Promise<string> {
     try {
       // Extraer la base64 del Data URL
@@ -222,6 +225,7 @@ export class CrudPage implements OnInit, OnDestroy {
       if (success) {
         this.products = this.products.filter(p => p.id !== id);
         this.presentToast('Producto eliminado con éxito');
+        await this.loadProducts();
       } else {
         throw new Error('No se pudo eliminar el producto');
       }

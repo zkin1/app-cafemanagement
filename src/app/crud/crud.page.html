@@ -26,23 +26,33 @@
   <!-- Agregar Producto -->
   <div *ngIf="activeSection === 'add'">
     <h2>Agregar Producto</h2>
-    <form (ngSubmit)="addProduct()">
+    <form (ngSubmit)="addProduct()" #productForm="ngForm">
       <ion-item>
         <ion-label position="floating">Nombre</ion-label>
-        <ion-input [(ngModel)]="currentProduct.name" name="name" required></ion-input>
+        <ion-input [(ngModel)]="currentProduct.name" name="name" required minlength="3" #name="ngModel"></ion-input>
       </ion-item>
+      <ion-note *ngIf="name.invalid && name.touched" color="danger">
+        El nombre es requerido y debe tener al menos 3 caracteres.
+      </ion-note>
+  
       <ion-item>
         <ion-label position="floating">Descripción</ion-label>
         <ion-textarea [(ngModel)]="currentProduct.description" name="description" required></ion-textarea>
       </ion-item>
+      
       <ion-item>
         <ion-label position="floating">Precio</ion-label>
-        <ion-input type="number" [(ngModel)]="currentProduct.price" name="price" required></ion-input>
+        <ion-input type="number" [(ngModel)]="currentProduct.price" name="price" required min="0" #price="ngModel"></ion-input>
       </ion-item>
+      <ion-note *ngIf="price.invalid && price.touched" color="danger">
+        El precio es requerido y no puede ser negativo.
+      </ion-note>
+  
       <ion-item>
         <ion-label position="floating">Categoría</ion-label>
         <ion-input [(ngModel)]="currentProduct.category" name="category" required></ion-input>
       </ion-item>
+  
       <ion-item>
         <ion-label>Imagen del producto</ion-label>
         <ion-button (click)="selectImage()">
@@ -50,59 +60,70 @@
           Seleccionar imagen
         </ion-button>
       </ion-item>
+  
       <ion-item *ngIf="currentProduct.imageURL">
         <img [src]="currentProduct.imageURL" alt="Vista previa de la imagen" style="max-width: 100%; height: auto;">
       </ion-item>
-      <ion-button expand="block" type="submit" class="ion-margin-top">Agregar Producto</ion-button>
+  
+      <ion-button expand="block" type="submit" class="ion-margin-top" [disabled]="productForm.invalid">
+        Agregar Producto
+      </ion-button>
     </form>
   </div>
 
   <!-- Editar Producto -->
-  <div *ngIf="activeSection === 'edit'">
-    <h2>Editar Producto</h2>
-    <form (ngSubmit)="updateProduct()">
-      <ion-item>
-        <ion-label position="floating">Nombre</ion-label>
-        <ion-input [(ngModel)]="currentProduct.name" name="name" required></ion-input>
-      </ion-item>
-      <ion-item>
-        <ion-label position="floating">Descripción</ion-label>
-        <ion-textarea [(ngModel)]="currentProduct.description" name="description" required></ion-textarea>
-      </ion-item>
-      <ion-item>
-        <ion-label position="floating">Precio</ion-label>
-        <ion-input type="number" [(ngModel)]="currentProduct.price" name="price" required></ion-input>
-      </ion-item>
-      <ion-item>
-        <ion-label position="floating">Categoría</ion-label>
-        <ion-input [(ngModel)]="currentProduct.category" name="category" required></ion-input>
-      </ion-item>
-      <ion-item>
-        <ion-label>Imagen del producto</ion-label>
-        <ion-button (click)="selectImage()">
-          <ion-icon name="camera-outline" slot="start"></ion-icon>
-          Cambiar imagen
-        </ion-button>
-      </ion-item>
-      <ion-item *ngIf="currentProduct.imageURL">
-        <img [src]="currentProduct.imageURL" alt="Vista previa de la imagen" style="max-width: 100%; height: auto;">
-      </ion-item>
-      <ion-button expand="block" type="submit" class="ion-margin-top">Actualizar Producto</ion-button>
-    </form>
-    <ion-list>
-      <ion-item *ngFor="let product of products">
-        <ion-thumbnail slot="start">
-          <img [src]="product.imageURL" [alt]="product.name" (error)="handleImageError($event)">
-        </ion-thumbnail>
-        <ion-label>
-          <h2>{{ product.name }}</h2>
-          <p>{{ product.description }}</p>
-          <p>Precio: {{ product.price | currency:'CLP':'symbol-narrow':'1.0-0' }}</p>
-        </ion-label>
-        <ion-button slot="end" (click)="editProduct(product)">Editar</ion-button>
-      </ion-item>
-    </ion-list>
-  </div>
+<div *ngIf="activeSection === 'edit'">
+  <h2>Editar Producto</h2>
+  <form (ngSubmit)="updateProduct()" #editProductForm="ngForm">
+    <ion-item>
+      <ion-label position="floating">Nombre</ion-label>
+      <ion-input [(ngModel)]="currentProduct.name" name="name" required></ion-input>
+    </ion-item>
+    <div *ngIf="editProductForm.submitted && !editProductForm.controls['name']?.valid" class="error">
+      El nombre es obligatorio.
+    </div>
+
+    <ion-item>
+      <ion-label position="floating">Descripción</ion-label>
+      <ion-textarea [(ngModel)]="currentProduct.description" name="description" required></ion-textarea>
+    </ion-item>
+    <div *ngIf="editProductForm.submitted && !editProductForm.controls['description']?.valid" class="error">
+      La descripción es obligatoria.
+    </div>
+
+    <ion-item>
+      <ion-label position="floating">Precio</ion-label>
+      <ion-input type="number" [(ngModel)]="currentProduct.price" name="price" required></ion-input>
+    </ion-item>
+    <div *ngIf="editProductForm.submitted && (!editProductForm.controls['price']?.valid || currentProduct.price < 0)" class="error">
+      El precio debe ser mayor o igual a 0.
+    </div>
+
+    <ion-item>
+      <ion-label position="floating">Categoría</ion-label>
+      <ion-input [(ngModel)]="currentProduct.category" name="category" required></ion-input>
+    </ion-item>
+    <div *ngIf="editProductForm.submitted && !editProductForm.controls['category']?.valid" class="error">
+      La categoría es obligatoria.
+    </div>
+
+    <ion-item>
+      <ion-label>Imagen del producto</ion-label>
+      <ion-button (click)="selectImage()">
+        <ion-icon name="camera-outline" slot="start"></ion-icon>
+        Cambiar imagen
+      </ion-button>
+    </ion-item>
+    <ion-item *ngIf="currentProduct.imageURL">
+      <img [src]="currentProduct.imageURL" alt="Vista previa de la imagen" style="max-width: 100%; height: auto;">
+    </ion-item>
+
+    <ion-button expand="block" type="submit" class="ion-margin-top" [disabled]="!editProductForm.valid || currentProduct.price < 0">
+      Actualizar Producto
+    </ion-button>
+  </form>
+</div>
+
 
   <!-- Eliminar Producto -->
   <div *ngIf="activeSection === 'delete'">

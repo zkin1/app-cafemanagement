@@ -58,18 +58,20 @@ export class MainPage implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+    // Llamar a loadProducts solo una vez cuando la página se inicializa
     this.loadProducts();
-    this.loadCurrentOrder();
-
-    // Suscribirse a los eventos de navegación
+    this.loadCurrentOrder(); // Carga de la orden actual
+    
+    // Mantén la lógica de la suscripción para la orden, pero sin recargar los productos
     this.navigationSubscription.add(
       this.router.events.pipe(
         filter((event): event is NavigationEnd => event instanceof NavigationEnd)
       ).subscribe(() => {
-        this.loadCurrentOrder();
+        this.loadCurrentOrder(); // Solo recargar la orden, no los productos
       })
     );
   }
+  
   ngOnDestroy() {
     if (this.navigationSubscription) {
       this.navigationSubscription.unsubscribe();
@@ -91,8 +93,7 @@ export class MainPage implements OnInit, OnDestroy {
   resetCart() {
     const lastOrderNumber = parseInt(localStorage.getItem('lastOrderNumber') || '0');
     this.currentOrderNumber = lastOrderNumber + 1;
-    this.currentOrderItems = [];
-    this.updateLocalStorage();
+    localStorage.setItem('lastOrderNumber', this.currentOrderNumber.toString());
   }
 
 
@@ -108,7 +109,7 @@ export class MainPage implements OnInit, OnDestroy {
   
       this.products = products.map(product => ({
         ...product,
-        imageURL: product.imageURL.startsWith('assets/') ? product.imageURL : `assets/${product.imageURL}`,
+        imageURL: this.getImageUrl(product.imageURL),
         showOptions: false,
         selectedSize: 'medium',
         selectedMilk: 'regular'
@@ -117,12 +118,22 @@ export class MainPage implements OnInit, OnDestroy {
       console.log('Productos procesados:', this.products);
     } catch (error) {
       console.error('Error al cargar los productos:', error);
-      this.presentToast('Error al cargar los productos. Por favor, intente de nuevo.');
+      await this.presentToast('Error al cargar los productos. Por favor, intente de nuevo.');
     } finally {
       await loading.dismiss();
     }
   }
-
+  private getImageUrl(imageUri: string): string {
+    if (!imageUri) {
+      return 'assets/default-product-image.jpg';
+    }
+  
+    if (imageUri.startsWith('data:image') || imageUri.startsWith('assets/')) {
+      return imageUri;
+    }
+  
+    return `assets/${imageUri}`;
+  }
 
   private getAllProducts(): Promise<Product[]> {
     return new Promise((resolve, reject) => {

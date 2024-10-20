@@ -301,7 +301,17 @@ export class DatabaseService {
 
   getAllProducts(): Observable<Product[]> {
     console.log('Obteniendo todos los productos...');
-    return from(this.database.executeSql('SELECT * FROM Products', [])).pipe(
+    const query = `
+      SELECT DISTINCT p.*
+      FROM Products p
+      LEFT JOIN (
+        SELECT Name, MIN(ProductID) as MinID
+        FROM Products
+        GROUP BY Name
+      ) p2 ON p.Name = p2.Name AND p.ProductID = p2.MinID
+      WHERE p2.MinID IS NOT NULL
+    `;
+    return from(this.database.executeSql(query, [])).pipe(
       map(data => {
         console.log('Resultado de la consulta de productos:', JSON.stringify(data));
         let products: Product[] = [];
@@ -631,8 +641,6 @@ export class DatabaseService {
         });
     });
   }
-
-  // Método para insertar datos de prueba
 
 
 insertSeedData(): Observable<boolean> {
