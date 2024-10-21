@@ -90,6 +90,32 @@ ion-fab-button {
   --box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
+ion-modal {
+  --height: auto;
+  --width: 90%;
+  --border-radius: 16px;
+  --box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+@media (min-width: 768px) {
+  ion-modal {
+    --width: 600px;
+  }
+}
+
+.ion-padding {
+  padding: 20px;
+}
+
+form {
+  ion-item {
+    --padding-start: 0;
+    --inner-padding-end: 0;
+    --background: transparent;
+  }
+}
+
+
 // Animations
 @keyframes fadeInUp {
   from { 

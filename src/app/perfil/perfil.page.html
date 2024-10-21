@@ -10,9 +10,9 @@
 <ion-content class="ion-padding">
   <div class="profile-picture-container">
     <img [src]="profilePicture || 'assets/default-avatar.png'" 
-     (error)="handleImageError($event)" 
-     alt="Foto de perfil" 
-     class="profile-picture">
+    (error)="handleImageError($event)" 
+    alt="Foto de perfil" 
+    class="profile-picture">
     <ion-button (click)="takePicture()" expand="block" fill="outline">
       <ion-icon name="camera-outline" slot="start"></ion-icon>
       Cambiar foto
@@ -22,26 +22,32 @@
   <ion-card>
     <ion-card-header>
       <ion-card-title>
-        <ion-icon name="person-circle-outline"></ion-icon>
+        <ion-icon name="person-outline"></ion-icon>
         Información Personal
       </ion-card-title>
     </ion-card-header>
     <ion-card-content>
-      <form (ngSubmit)="updatePerfil()" #perfilForm="ngForm">
+      <form [formGroup]="perfilForm" (ngSubmit)="updatePerfil()">
         <ion-item>
           <ion-label position="stacked">Nombre</ion-label>
-          <ion-input [(ngModel)]="usuario.Name" name="name" required #name="ngModel" placeholder="Ingrese su nombre"></ion-input>
+          <ion-input formControlName="name" type="text"></ion-input>
         </ion-item>
-        <ion-text color="danger" *ngIf="name.invalid && (name.dirty || name.touched)">
-          <small>El nombre es requerido</small>
+        <ion-text color="danger" *ngIf="perfilForm.get('name')?.hasError('required') && perfilForm.get('name')?.touched">
+          El nombre es requerido
+        </ion-text>
+        <ion-text color="danger" *ngIf="perfilForm.get('name')?.hasError('minlength') && perfilForm.get('name')?.touched">
+          El nombre debe tener al menos 3 caracteres
         </ion-text>
 
         <ion-item>
           <ion-label position="stacked">Email</ion-label>
-          <ion-input [(ngModel)]="usuario.Email" name="email" type="email" required #email="ngModel" pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$" placeholder="Ingrese su email"></ion-input>
+          <ion-input formControlName="email" type="email"></ion-input>
         </ion-item>
-        <ion-text color="danger" *ngIf="email.invalid && (email.dirty || email.touched)">
-          <small>Por favor, ingrese un email válido</small>
+        <ion-text color="danger" *ngIf="perfilForm.get('email')?.hasError('required') && perfilForm.get('email')?.touched">
+          El email es requerido
+        </ion-text>
+        <ion-text color="danger" *ngIf="perfilForm.get('email')?.hasError('email') && perfilForm.get('email')?.touched">
+          Por favor, ingrese un email válido
         </ion-text>
 
         <ion-item>
@@ -49,7 +55,7 @@
           <ion-input [value]="usuario.Role === 'admin' ? 'Administrador' : 'Empleado'" readonly></ion-input>
         </ion-item>
 
-        <ion-button expand="block" type="submit" [disabled]="!perfilForm.form.valid">
+        <ion-button expand="block" type="submit" [disabled]="!perfilForm.valid">
           <ion-icon name="save-outline" slot="start"></ion-icon>
           Actualizar Perfil
         </ion-button>
@@ -65,32 +71,38 @@
       </ion-card-title>
     </ion-card-header>
     <ion-card-content>
-      <form (ngSubmit)="cambiarContrasena()" #passwordForm="ngForm">
+      <form [formGroup]="passwordForm" (ngSubmit)="cambiarContrasena()">
         <ion-item>
           <ion-label position="stacked">Contraseña Actual</ion-label>
-          <ion-input [(ngModel)]="datosContrasena.contrasenaActual" name="contrasenaActual" type="password" required #contrasenaActual="ngModel" placeholder="Ingrese su contraseña actual"></ion-input>
+          <ion-input type="password" formControlName="contrasenaActual"></ion-input>
         </ion-item>
-        <ion-text color="danger" *ngIf="contrasenaActual.invalid && (contrasenaActual.dirty || contrasenaActual.touched)">
-          <small>La contraseña actual es requerida</small>
+        <ion-text color="danger" *ngIf="passwordForm.get('contrasenaActual')?.hasError('required') && passwordForm.get('contrasenaActual')?.touched">
+          La contraseña actual es requerida
         </ion-text>
 
         <ion-item>
           <ion-label position="stacked">Nueva Contraseña</ion-label>
-          <ion-input [(ngModel)]="datosContrasena.nuevaContrasena" name="nuevaContrasena" type="password" required minlength="8" #nuevaContrasena="ngModel" placeholder="Ingrese su nueva contraseña"></ion-input>
+          <ion-input type="password" formControlName="nuevaContrasena"></ion-input>
         </ion-item>
-        <ion-text color="danger" *ngIf="nuevaContrasena.invalid && (nuevaContrasena.dirty || nuevaContrasena.touched)">
-          <small>La nueva contraseña debe tener al menos 8 caracteres</small>
+        <ion-text color="danger" *ngIf="passwordForm.get('nuevaContrasena')?.hasError('required') && passwordForm.get('nuevaContrasena')?.touched">
+          La nueva contraseña es requerida
+        </ion-text>
+        <ion-text color="danger" *ngIf="passwordForm.get('nuevaContrasena')?.hasError('minlength') && passwordForm.get('nuevaContrasena')?.touched">
+          La nueva contraseña debe tener al menos 8 caracteres
+        </ion-text>
+        <ion-text color="danger" *ngIf="passwordForm.get('nuevaContrasena')?.hasError('invalidPassword') && passwordForm.get('nuevaContrasena')?.touched">
+          La contraseña debe contener al menos una letra mayúscula, una minúscula, un número y un carácter especial
         </ion-text>
 
         <ion-item>
           <ion-label position="stacked">Confirmar Nueva Contraseña</ion-label>
-          <ion-input [(ngModel)]="datosContrasena.confirmarContrasena" name="confirmarContrasena" type="password" required #confirmarContrasena="ngModel" placeholder="Confirme su nueva contraseña"></ion-input>
+          <ion-input type="password" formControlName="confirmarContrasena"></ion-input>
         </ion-item>
-        <ion-text color="danger" *ngIf="nuevaContrasena.value !== confirmarContrasena.value && (confirmarContrasena.dirty || confirmarContrasena.touched)">
-          <small>Las contraseñas no coinciden</small>
+        <ion-text color="danger" *ngIf="passwordForm.hasError('passwordMismatch') && passwordForm.get('confirmarContrasena')?.touched">
+          Las contraseñas no coinciden
         </ion-text>
 
-        <ion-button expand="block" type="submit" [disabled]="!passwordForm.form.valid || nuevaContrasena.value !== confirmarContrasena.value">
+        <ion-button expand="block" type="submit" [disabled]="!passwordForm.valid">
           <ion-icon name="key-outline" slot="start"></ion-icon>
           Cambiar Contraseña
         </ion-button>

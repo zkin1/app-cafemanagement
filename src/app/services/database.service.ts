@@ -368,12 +368,21 @@ export class DatabaseService {
     );
   }
   
-  async getOrdersCount(statuses: string[]): Promise<number> {
-    const placeholders = statuses.map(() => '?').join(',');
-    const query = `SELECT COUNT(*) as count FROM Orders WHERE Status IN (${placeholders})`;
-    const result = await this.database.executeSql(query, statuses);
+  async getOrdersCount(statuses: string[], date?: string): Promise<number> {
+    let placeholders = statuses.map(() => '?').join(',');
+    let query = `SELECT COUNT(*) as count FROM Orders WHERE Status IN (${placeholders})`;
+    let params = [...statuses];
+  
+    if (date) {
+      query += ' AND DATE(CreatedAt) = ?';
+      params.push(date);
+    }
+  
+    const result = await this.database.executeSql(query, params);
     return result.rows.item(0).count;
   }
+
+  
   // Método de autenticación
   async authenticateUser(email: string, password: string): Promise<User | null> {
     console.log('Intentando autenticar usuario:', email);

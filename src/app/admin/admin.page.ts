@@ -224,7 +224,7 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
     let currentDate = new Date(startDate);
     
     while (currentDate <= endDate) {
-      const [dayTotal, canceledTotal] = await Promise.all([
+      const [dayTotal, canceledTotal, canceledOrders] = await Promise.all([
         this.databaseService.calculateTotalSales(
           currentDate.toISOString().split('T')[0],
           currentDate.toISOString().split('T')[0],
@@ -234,14 +234,16 @@ export class AdminPage implements OnInit, AfterViewInit, OnDestroy {
           currentDate.toISOString().split('T')[0],
           currentDate.toISOString().split('T')[0],
           ['Cancelado']
-        )
+        ),
+        this.databaseService.getOrdersCount(['Cancelado'], currentDate.toISOString().split('T')[0])
       ]);
       
       dailySales.push({
         day: daysOfWeek[currentDate.getDay()],
         date: new Date(currentDate),
         amount: dayTotal,
-        canceledAmount: canceledTotal
+        canceledAmount: canceledTotal,
+        canceledOrders: canceledOrders
       });
   
       currentDate.setDate(currentDate.getDate() + 1);

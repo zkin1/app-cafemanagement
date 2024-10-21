@@ -1,11 +1,11 @@
-import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
-import { NgForm } from '@angular/forms';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController, LoadingController, AlertController } from '@ionic/angular';
 import { Subscription } from 'rxjs';
 import { DatabaseService } from '../services/database.service';
 import { User } from '../models/user.model';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { FormBuilder, FormGroup, Validators, AbstractControl } from '@angular/forms';
 
 @Component({
   selector: 'app-perfil',
@@ -13,8 +13,6 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
   styleUrls: ['./perfil.page.scss'],
 })
 export class PerfilPage implements OnInit, OnDestroy {
-  @ViewChild('perfilForm') perfilForm!: NgForm;
-  @ViewChild('passwordForm') passwordForm!: NgForm;
   toastColor: string = 'success';
   showToast: boolean = false;
   toastMessage: string = '';
@@ -33,22 +31,32 @@ export class PerfilPage implements OnInit, OnDestroy {
     ApprovalStatus: 'approved'
   };
 
-  datosContrasena = {
-    contrasenaActual: '',
-    nuevaContrasena: '',
-    confirmarContrasena: ''
-  };
+  perfilForm: FormGroup;
+  passwordForm: FormGroup;
 
   esAdmin: boolean = false;
   private subscriptions: Subscription = new Subscription();
 
   constructor(
+    private formBuilder: FormBuilder,
     private databaseService: DatabaseService,
     private toastController: ToastController,
     private loadingController: LoadingController,
     private alertController: AlertController,
     private router: Router
-  ) { }
+  ) { 
+    this.perfilForm = this.formBuilder.group({
+      name: ['', [Validators.required, Validators.minLength(3)]],
+      email: ['', [Validators.required, Validators.email]],
+      phoneNumber: ['']
+    });
+
+    this.passwordForm = this.formBuilder.group({
+      contrasenaActual: ['', [Validators.required]],
+      nuevaContrasena: ['', [Validators.required, Validators.minLength(8), this.passwordValidator]],
+      confirmarContrasena: ['', [Validators.required]]
+    }, { validators: this.passwordMatchValidator });
+  }
 
   ngOnInit() {
     this.cargarPerfilUsuario();
@@ -58,6 +66,27 @@ export class PerfilPage implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.subscriptions.unsubscribe();
+  }
+
+  passwordValidator(control: AbstractControl): { [key: string]: boolean } | null {
+    const password = control.value;
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    
+    if (!hasSpecialChar || !hasUpperCase || !hasLowerCase || !hasNumber) {
+      return { 'invalidPassword': true };
+    }
+    return null;
+  }
+
+  passwordMatchValidator(group: AbstractControl): { [key: string]: boolean } | null {
+    const nuevaContrasena = group.get('nuevaContrasena');
+    const confirmarContrasena = group.get('confirmarContrasena');
+    return nuevaContrasena && confirmarContrasena && nuevaContrasena.value !== confirmarContrasena.value
+      ? { 'passwordMismatch': true }
+      : null;
   }
 
   async cargarPerfilUsuario() {
@@ -71,10 +100,15 @@ export class PerfilPage implements OnInit, OnDestroy {
       if (!userId) {
         throw new Error('No se encontró un usuario activo');
       }
-  
       this.usuario = await this.getUserById(userId);
       this.esAdmin = this.usuario.Role === 'admin';
       await this.loadProfilePicture(userId);
+      
+      this.perfilForm.patchValue({
+        name: this.usuario.Name,
+        email: this.usuario.Email,
+        phoneNumber: this.usuario.PhoneNumber
+      });
       
       console.log('Usuario cargado:', this.usuario);
       console.log('Es admin:', this.esAdmin);
@@ -105,10 +139,13 @@ export class PerfilPage implements OnInit, OnDestroy {
   async loadProfilePicture(userId: number) {
     try {
       const result = await this.databaseService.getUserProfilePicture(userId).toPromise();
-      this.profilePicture = result !== undefined ? result : null;
+      this.profilePicture = result || 'assets/default-avatar.png';
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      currentUser.profilePicture = this.profilePicture;
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
     } catch (error) {
       console.error('Error loading profile picture:', error);
-      this.profilePicture = null;
+      this.profilePicture = 'assets/default-avatar.png';
     }
   }
 
@@ -125,43 +162,50 @@ export class PerfilPage implements OnInit, OnDestroy {
       const userId = this.obtenerIdUsuarioActual();
       if (userId && this.profilePicture) {
         await this.databaseService.updateUserProfilePicture(userId, this.profilePicture);
-        // Actualizar el localStorage con la nueva imagen
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         currentUser.profilePicture = this.profilePicture;
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
         await this.presentToast('Foto de perfil actualizada con éxito');
+      } else {
+        throw new Error('No se pudo obtener el ID del usuario o la imagen');
       }
     } catch (error) {
-      console.error('Error taking picture:', error);
-      await this.presentToast('Error al tomar la foto');
+      console.error('Error detallado al tomar la foto:', error);
+      if (error instanceof Error) {
+        await this.presentToast(`Error al tomar la foto: ${error.message}`);
+      } else {
+        await this.presentToast('Error desconocido al tomar la foto');
+      }
     }
   }
 
   async updatePerfil() {
-    if (!this.perfilForm.valid) {
-      await this.presentToast('Por favor, complete todos los campos correctamente.');
-      return;
-    }
+    if (this.perfilForm.valid) {
+      const loading = await this.loadingController.create({
+        message: 'Actualizando perfil...',
+      });
+      await loading.present();
+    
+      try {
+        const formValues = this.perfilForm.value;
+        this.usuario.Name = formValues.name;
+        this.usuario.Email = formValues.email;
+        this.usuario.PhoneNumber = formValues.phoneNumber;
 
-    const loading = await this.loadingController.create({
-      message: 'Actualizando perfil...',
-    });
-    await loading.present();
-  
-    try {
-      const currentRole = this.usuario.Role;
-      const success = await this.updateUser(this.usuario);
-      if (success) {
-        this.usuario.Role = currentRole;
-        await this.presentToast('Perfil actualizado con éxito');
-      } else {
-        throw new Error('No se pudo actualizar el perfil');
+        const success = await this.updateUser(this.usuario);
+        if (success) {
+          await this.presentToast('Perfil actualizado con éxito');
+        } else {
+          throw new Error('No se pudo actualizar el perfil');
+        }
+      } catch (error) {
+        console.error('Error al actualizar el perfil:', error);
+        await this.presentToast('Error al actualizar el perfil. Por favor, intente de nuevo.');
+      } finally {
+        await loading.dismiss();
       }
-    } catch (error) {
-      console.error('Error al actualizar el perfil:', error);
-      await this.presentToast('Error al actualizar el perfil. Por favor, intente de nuevo.');
-    } finally {
-      await loading.dismiss();
+    } else {
+      await this.presentToast('Por favor, complete todos los campos correctamente.');
     }
   }
 
@@ -176,39 +220,28 @@ export class PerfilPage implements OnInit, OnDestroy {
   }
 
   async cambiarContrasena() {
-    if (!this.passwordForm.valid) {
-      await this.presentToast('Por favor, complete todos los campos correctamente.');
-      return;
-    }
-
-    if (this.datosContrasena.nuevaContrasena !== this.datosContrasena.confirmarContrasena) {
-      await this.presentToast('Las contraseñas no coinciden');
-      return;
-    }
-
-    if (this.datosContrasena.nuevaContrasena.length < 8) {
-      await this.presentToast('La nueva contraseña debe tener al menos 8 caracteres');
-      return;
-    }
-
-    const alert = await this.alertController.create({
-      header: 'Confirmar cambio de contraseña',
-      message: '¿Estás seguro de que quieres cambiar tu contraseña?',
-      buttons: [
-        {
-          text: 'Cancelar',
-          role: 'cancel'
-        },
-        {
-          text: 'Confirmar',
-          handler: () => {
-            this.realizarCambioContrasena();
+    if (this.passwordForm.valid) {
+      const alert = await this.alertController.create({
+        header: 'Confirmar cambio de contraseña',
+        message: '¿Estás seguro de que quieres cambiar tu contraseña?',
+        buttons: [
+          {
+            text: 'Cancelar',
+            role: 'cancel'
+          },
+          {
+            text: 'Confirmar',
+            handler: () => {
+              this.realizarCambioContrasena();
+            }
           }
-        }
-      ]
-    });
+        ]
+      });
 
-    await alert.present();
+      await alert.present();
+    } else {
+      await this.presentToast('Por favor, complete todos los campos correctamente.');
+    }
   }
 
   private async realizarCambioContrasena() {
@@ -218,15 +251,15 @@ export class PerfilPage implements OnInit, OnDestroy {
     await loading.present();
 
     try {
+      const formValues = this.passwordForm.value;
       const success = await this.updateUserPassword(
         this.usuario.UserID!,
-        this.datosContrasena.contrasenaActual,
-        this.datosContrasena.nuevaContrasena
+        formValues.contrasenaActual,
+        formValues.nuevaContrasena
       );
       if (success) {
         await this.presentToast('Contraseña cambiada con éxito');
-        this.datosContrasena = { contrasenaActual: '', nuevaContrasena: '', confirmarContrasena: '' };
-        this.passwordForm.resetForm();
+        this.passwordForm.reset();
       } else {
         throw new Error('No se pudo cambiar la contraseña');
       }
@@ -251,7 +284,8 @@ export class PerfilPage implements OnInit, OnDestroy {
     const toast = await this.toastController.create({
       message: message,
       duration: 2000,
-      position: 'top'
+      position: 'top',
+      color: this.toastColor
     });
     await toast.present();
   }

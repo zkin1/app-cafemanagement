@@ -22,6 +22,18 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
   filteredUsers: User[] = [];
   profilePicture: string | null = null;
 
+  isAddUserModalOpen: boolean = false;
+  newUser: User = {
+    Name: '',
+    Email: '',
+    Password: '',
+    Role: 'employee',
+    Username: '',
+    ApprovalStatus: 'pending',
+    ProfilePicture: undefined
+  };
+
+
   constructor(
     private databaseService: DatabaseService,
     private alertController: AlertController,
@@ -41,6 +53,51 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
 
   loadMoreUsers(event: any) {
     event.target.complete();
+  }
+
+
+  openAddUserModal() {
+    this.isAddUserModalOpen = true;
+    console.log('Modal abierto:', this.isAddUserModalOpen);
+  }
+
+  cancelAddUser() {
+    this.isAddUserModalOpen = false;
+    this.resetNewUser();
+  }
+
+  resetNewUser() {
+    this.newUser = {
+      Name: '',
+      Email: '',
+      Password: '',
+      Role: 'employee',
+      Username: '',
+      ApprovalStatus: 'pending',
+      ProfilePicture: undefined
+    };
+  }
+
+  async submitAddUser() {
+    if (this.newUser.Name && this.newUser.Email && this.newUser.Password) {
+      this.newUser.Username = this.newUser.Email;
+      try {
+        const userId = await this.databaseService.createUser(this.newUser);
+        if (userId) {
+          this.newUser.UserID = userId;
+          this.users.push({ ...this.newUser });
+          this.filteredUsers = [...this.users];
+          this.presentToast('Usuario creado con éxito', 'success');
+          this.isAddUserModalOpen = false;
+          this.resetNewUser();
+        }
+      } catch (error) {
+        console.error('Error al crear usuario:', error);
+        this.presentToast('Error al crear usuario', 'danger');
+      }
+    } else {
+      this.presentToast('Por favor, complete todos los campos', 'warning');
+    }
   }
 
   searchEmployees(event: any) {
@@ -70,10 +127,13 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
         try {
           const profilePicture = await this.databaseService.getUserProfilePicture(user.UserID!).toPromise();
           console.log(`Foto de perfil obtenida para el usuario ${user.UserID}:`, profilePicture);
-          return { ...user, ProfilePicture: profilePicture || undefined };
+          return { 
+            ...user, 
+            ProfilePicture: profilePicture || 'assets/default-avatar.png'
+          };
         } catch (error) {
           console.error(`Error al obtener la foto de perfil para el usuario ${user.UserID}:`, error);
-          return { ...user, ProfilePicture: undefined };
+          return { ...user, ProfilePicture: 'assets/default-avatar.png' };
         }
       }));
   
@@ -84,6 +144,10 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
         this.presentToast('No se encontraron empleados.', 'warning');
       } else {
         this.presentToast(`Se cargaron ${this.users.length} empleados.`, 'success');
+      }
+  
+      if (this.users.length > 0) {
+        this.showSlideInstruction();
       }
   
     } catch (error) {
@@ -179,11 +243,26 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
         resultType: CameraResultType.DataUrl,
         source: CameraSource.Prompt
       });
-
+  
       const profilePicture = image.dataUrl;
       if (profilePicture) {
         await this.databaseService.updateUserProfilePicture(user.UserID!, profilePicture);
-        user.ProfilePicture = profilePicture;
+        
+        // Actualizar el usuario en la lista local
+        const index = this.users.findIndex(u => u.UserID === user.UserID);
+        if (index !== -1) {
+          this.users[index].ProfilePicture = profilePicture;
+          this.filteredUsers = [...this.users];
+        }
+  
+        // Si el usuario actual es el administrador, actualizar también el localStorage
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        if (currentUser.id === user.UserID) {
+          currentUser.profilePicture = profilePicture;
+          localStorage.setItem('currentUser', JSON.stringify(currentUser));
+          this.profilePicture = profilePicture;
+        }
+  
         this.presentToast('Foto de perfil actualizada con éxito', 'success');
       }
     } catch (error) {
@@ -192,6 +271,23 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
     }
   }
 
+  async reloadUser(userId: number) {
+    try {
+      const updatedUser = await this.databaseService.getUserById(userId).toPromise();
+      if (updatedUser) {
+        const profilePicture = await this.databaseService.getUserProfilePicture(userId).toPromise();
+        updatedUser.ProfilePicture = profilePicture || 'assets/default-avatar.png';
+  
+        const index = this.users.findIndex(u => u.UserID === userId);
+        if (index !== -1) {
+          this.users[index] = updatedUser;
+          this.filteredUsers = this.filteredUsers.map(u => u.UserID === userId ? updatedUser : u);
+        }
+      }
+    } catch (error) {
+      console.error('Error al recargar usuario:', error);
+    }
+  }
   async changeRole(user: User) {
     const alert = await this.alertController.create({
       header: 'Cambiar Rol',
@@ -272,11 +368,8 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
     try {
       const success = await this.databaseService.updateUserFromDb(user);
       if (success) {
+        await this.reloadUser(user.UserID!);
         this.presentToast('Usuario actualizado con éxito', 'success');
-        const index = this.users.findIndex(u => u.UserID === user.UserID);
-        if (index !== -1) {
-          this.users[index] = { ...user };
-        }
       }
     } catch (error) {
       console.error('Error al actualizar usuario:', error);
@@ -442,6 +535,23 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
     });
 
     await alert.present();
+  }
+
+  async showSlideInstruction() {
+    const toast = await this.toastController.create({
+      message: 'Desliza hacia la izquierda sobre un empleado para modificarlo',
+      duration: 3000,
+      position: 'bottom',
+      color: 'primary',
+      buttons: [
+        {
+          side: 'end',
+          icon: 'close',
+          role: 'cancel'
+        }
+      ]
+    });
+    toast.present();
   }
 
   handleImageError(event: any) {

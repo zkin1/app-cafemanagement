@@ -6,7 +6,7 @@ import { User } from '../models/user.model';
 import { Subscription, Observable, from } from 'rxjs';
 import { mergeMap, map } from 'rxjs/operators';
 import { firstValueFrom } from 'rxjs';
-
+import { AbstractControl, FormBuilder, FormGroup, Validators } from '@angular/forms';
 @Component({
   selector: 'app-register',
   templateUrl: './register.page.html',
@@ -19,6 +19,7 @@ export class RegisterPage implements OnDestroy {
   email: string = '';
   password: string = '';
   confirmPassword: string = '';
+  registerForm: FormGroup;
 
   private subscriptions: Subscription = new Subscription();
 
@@ -26,8 +27,38 @@ export class RegisterPage implements OnDestroy {
     private router: Router,
     private databaseService: DatabaseService,
     private toastController: ToastController,
-    private loadingController: LoadingController
-  ) {}
+    private loadingController: LoadingController,
+    private formBuilder: FormBuilder
+  ) {
+    this.registerForm = this.formBuilder.group({
+      name: ['', [Validators.required, Validators.minLength(3)]],
+      email: ['', [Validators.required, Validators.email]],
+      password: ['', [Validators.required, Validators.minLength(6), this.passwordValidator]],
+      confirmPassword: ['', [Validators.required]]
+    }, { validator: this.passwordMatchValidator });
+  }
+
+  passwordValidator(control: AbstractControl): { [key: string]: boolean } | null {
+    const password = control.value;
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    
+    if (!hasSpecialChar || !hasUpperCase || !hasLowerCase || !hasNumber) {
+      return { 'invalidPassword': true };
+    }
+    return null;
+  }
+
+  passwordMatchValidator(control: AbstractControl): { [key: string]: boolean } | null {
+    const password = control.get('password');
+    const confirmPassword = control.get('confirmPassword');
+    if (password && confirmPassword && password.value !== confirmPassword.value) {
+      return { 'passwordMismatch': true };
+    }
+    return null;
+  }
 
   ngOnDestroy() {
     this.subscriptions.unsubscribe();
@@ -35,13 +66,9 @@ export class RegisterPage implements OnDestroy {
 
   async onSubmit() {
     console.log('Iniciando proceso de registro');
-    if (!this.isFormValid()) {
+    if (this.registerForm.invalid) {
+      console.log('Formulario inválido');
       await this.presentToast('Por favor, complete todos los campos correctamente.');
-      return;
-    }
-  
-    if (this.password !== this.confirmPassword) {
-      await this.presentToast('Las contraseñas no coinciden.');
       return;
     }
   
@@ -52,7 +79,7 @@ export class RegisterPage implements OnDestroy {
   
     try {
       console.log('Verificando usuario existente');
-      const existingUser = await firstValueFrom(this.databaseService.getUserByEmail(this.email));
+      const existingUser = await firstValueFrom(this.databaseService.getUserByEmail(this.registerForm.get('email')?.value));
       if (existingUser) {
         console.log('Usuario ya existe');
         await this.presentToast('El email ya está registrado. Por favor, use otro.');
@@ -61,11 +88,11 @@ export class RegisterPage implements OnDestroy {
   
       console.log('Creando nuevo usuario');
       const newUser: User = {
-        Name: this.name,
-        Email: this.email,
-        Password: this.password,
+        Name: this.registerForm.get('name')?.value,
+        Email: this.registerForm.get('email')?.value,
+        Password: this.registerForm.get('password')?.value,
         Role: 'employee',
-        Username: this.email,
+        Username: this.registerForm.get('email')?.value,
         ApprovalStatus: 'pending'
       };
       
@@ -85,7 +112,7 @@ export class RegisterPage implements OnDestroy {
       await this.presentToast('Ocurrió un error durante el registro. Por favor, intente de nuevo.');
     } finally {
       console.log('Proceso de registro finalizado');
-      await loading.dismiss(); // Asegúrate de cerrar el loading spinner aquí
+      await loading.dismiss();
     }
   }
   private isFormValid(): boolean {

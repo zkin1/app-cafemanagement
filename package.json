@@ -7,7 +7,8 @@
     "start": "ng serve --configuration development",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
+    "test": "jest",
+    "test:watch": "jest --watch",
     "lint": "ng lint",
     "ionic:serve": "ng serve --configuration development"
   },
@@ -35,10 +36,12 @@
     "@capacitor/push-notifications": "^6.0.2",
     "@capacitor/splash-screen": "^6.0.2",
     "@capacitor/status-bar": "6.0.1",
+    "@emailjs/browser": "^4.4.1",
     "@ionic/angular": "^8.3.2",
     "chart.js": "^4.4.4",
     "cordova-plugin-androidx-adapter": "^1.1.3",
     "cordova-sqlite-storage": "^6.1.0",
+    "emailjs-com": "^3.2.0",
     "ionicons": "^7.0.0",
     "pdfmake": "^0.2.14",
     "rxjs": "^7.8.1",
@@ -59,6 +62,7 @@
     "@capacitor/cli": "^6.1.2",
     "@ionic/angular-toolkit": "^11.0.1",
     "@types/jasmine": "~5.1.0",
+    "@types/jest": "^29.5.13",
     "@types/pdfmake": "^0.2.9",
     "@types/sql.js": "^1.4.9",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
@@ -72,13 +76,33 @@
     "jasmine-core": "~5.1.0",
     "jasmine-spec-reporter": "~5.0.0",
     "jeep-sqlite": "^2.8.0",
+    "jest": "^29.7.0",
+    "jest-preset-angular": "^14.0.3",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
     "stream-browserify": "^3.0.0",
+    "ts-jest": "^29.2.5",
     "typescript": "~5.4.0"
   },
-  "description": "An Ionic project"
+  "description": "An Ionic project",
+  "jest": {
+    "preset": "jest-preset-angular",
+    "setupFilesAfterEnv": [
+      "<rootDir>/setup-jest.ts"
+    ],
+    "testPathIgnorePatterns": [
+      "<rootDir>/node_modules/",
+      "<rootDir>/dist/",
+      "<rootDir>/src/test.ts"
+    ],
+    "globals": {
+      "ts-jest": {
+        "tsconfig": "<rootDir>/tsconfig.spec.json",
+        "stringifyContentPathRegex": "\\.html$"
+      }
+    }
+  }
 }

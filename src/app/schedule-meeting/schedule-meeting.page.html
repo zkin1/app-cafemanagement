@@ -1,0 +1,52 @@
+<!-- schedule-meeting.page.html -->
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button></ion-back-button>
+    </ion-buttons>
+    <ion-title>Programar Reunión</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <form (ngSubmit)="scheduleMeeting($event)" #meetingForm="ngForm">
+    
+    <!-- Título de la reunión -->
+    <ion-item>
+      <ion-label position="floating">Título de la reunión</ion-label>
+      <ion-input [(ngModel)]="meeting.title" name="title" required></ion-input>
+    </ion-item>
+
+    <!-- Fecha y hora de la reunión (combinados en un solo campo) -->
+    <ion-item>
+      <ion-label position="floating">Fecha y hora</ion-label>
+      <ion-datetime
+        [(ngModel)]="meeting.datetime"
+        name="datetime"
+        displayFormat="DD/MM/YYYY HH:mm"
+        min="{{ currentDate }}"
+        presentation="date-time"
+        required>
+      </ion-datetime>
+    </ion-item>
+
+    <!-- Descripción de la reunión -->
+    <ion-item>
+      <ion-label position="floating">Descripción</ion-label>
+      <ion-textarea [(ngModel)]="meeting.description" name="description" rows="3"></ion-textarea>
+    </ion-item>
+
+    <!-- Correos de los participantes (selección de usuarios registrados) -->
+    <ion-item>
+      <ion-label position="floating">Participantes</ion-label>
+      <ion-select multiple="true" [(ngModel)]="meeting.participants" name="participants">
+        <ion-select-option *ngFor="let user of users" [value]="user.Email">{{ user.Name }} ({{ user.Email }})</ion-select-option>
+      </ion-select>
+    </ion-item>
+
+    <!-- Botón para programar la reunión -->
+    <ion-button expand="block" type="submit" [disabled]="!meetingForm.form.valid" class="ion-margin-top">
+      Programar Reunión
+    </ion-button>
+  </form>
+</ion-content>

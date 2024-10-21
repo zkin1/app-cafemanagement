@@ -1,0 +1,82 @@
+:host {
+    --ion-color-primary: #84B0A2;
+    --ion-color-secondary: #D4A082;
+    --ion-color-tertiary: #ECC9A3;
+    --ion-color-success: #2dd36f;
+    --ion-color-warning: #ffc409;
+    --ion-color-danger: #eb445a;
+    --ion-color-medium: #92949c;
+    --ion-color-light: #D4E7EE;
+    --ion-color-dark: #405770;
+  }
+  
+  ion-content {
+    --background: var(--ion-color-light);
+  }
+  
+  form {
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  ion-item {
+    --background: transparent;
+    --border-color: var(--ion-color-medium);
+    --highlight-height: 1px;
+    --highlight-color-focused: var(--ion-color-primary);
+    margin-bottom: 16px;
+  
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+  
+  ion-label {
+    color: var(--ion-color-dark);
+    font-weight: 500;
+  }
+  
+  ion-input, ion-textarea, ion-datetime {
+    --padding-start: 0;
+    font-size: 16px;
+    color: var(--ion-color-dark);
+  }
+  
+  ion-button {
+    --background: var(--ion-color-primary);
+    --background-hover: var(--ion-color-primary-shade);
+    --color: #ffffff;
+    --border-radius: 8px;
+    margin-top: 24px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  // Animaciones
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  form {
+    animation: fadeIn 0.3s ease-out;
+  }
+  
+  // Estilos responsivos
+  @media (max-width: 576px) {
+    form {
+      padding: 16px;
+    }
+  
+    ion-input, ion-textarea, ion-datetime {
+      font-size: 14px;
+    }
+  
+    ion-button {
+      font-size: 14px;
+    }
+  }

@@ -3,7 +3,7 @@
     <ion-buttons slot="start">
       <ion-menu-button></ion-menu-button>
     </ion-buttons>
-    <ion-title>Dashboard de Administrador</ion-title>
+    <ion-title>Reportes de ventas</ion-title>
   </ion-toolbar>
 </ion-header>
 <ion-content class="ion-padding">
@@ -47,7 +47,6 @@
             <div class="week-container">
               <div class="day-card" *ngFor="let day of dailySales" (click)="showDayDetails(day)">
                 <h3>{{ day.day }}</h3>
-                <p>{{ day.amount | currency:'CLP':'symbol-narrow':'1.0-0' }}</p>
               </div>
             </div>
           </ion-card-content>
@@ -64,7 +63,8 @@
           </ion-card-header>
           <ion-card-content>
             <p>Ventas: {{ selectedDay.amount | currency:'CLP':'symbol-narrow':'1.0-0' }}</p>
-            <p>Órdenes Canceladas: {{ ordenesCancel.cantidad }}</p>
+            <p>Órdenes Canceladas: {{ selectedDay.canceledOrders }}</p>
+            <p>Total Cancelado: {{ selectedDay.canceledAmount | currency:'CLP':'symbol-narrow':'1.0-0' }}</p>
           </ion-card-content>
         </ion-card>
       </ion-col>

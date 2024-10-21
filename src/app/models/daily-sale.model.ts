@@ -3,4 +3,5 @@ export interface DailySale {
   date: Date;
   amount: number;
   canceledAmount: number;
+  canceledOrders: number;
 }

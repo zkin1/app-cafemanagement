@@ -18,7 +18,7 @@ export class ComandasPage implements OnInit, OnDestroy {
   ordenesEnProceso: Order[] = [];
   ordenesListas: Order[] = [];
   ordenesCanceladas: Order[] = [];
-
+  totalOrdenesDiarias: number = 0;
   showToast: boolean = false;
   toastMessage: string = '';
   
@@ -31,8 +31,9 @@ export class ComandasPage implements OnInit, OnDestroy {
     private loadingController: LoadingController
   ) { }
 
-  ngOnInit() {
-    this.cargarOrdenes();
+  async ngOnInit() {
+    await this.cargarOrdenes();
+    await this.calcularTotalOrdenesDiarias();
   }
 
   ngOnDestroy() {
@@ -204,6 +205,16 @@ export class ComandasPage implements OnInit, OnDestroy {
            this.ordenesEnProceso.length > 0 || 
            this.ordenesListas.length > 0 || 
            this.ordenesCanceladas.length > 0;
+  }
+
+  async calcularTotalOrdenesDiarias() {
+    const fechaActual = new Date().toISOString().split('T')[0]; // Obtiene la fecha actual en formato YYYY-MM-DD
+    try {
+      this.totalOrdenesDiarias = await this.databaseService.getOrdersCount(['Solicitado', 'En proceso', 'Listo', 'Entregado'], fechaActual);
+    } catch (error) {
+      console.error('Error al calcular el total de órdenes diarias:', error);
+      this.presentToast('Error al calcular el total de órdenes diarias.');
+    }
   }
 
   totalOrdenes(): number {

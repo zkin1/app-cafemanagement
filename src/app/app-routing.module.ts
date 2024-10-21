@@ -16,6 +16,11 @@ const routes: Routes = [
         path: 'admin',
         loadChildren: () => import('./admin/admin.module').then(m => m.AdminPageModule)
       },
+
+      {
+        path: 'schedule-meeting',
+        loadChildren: () => import('./schedule-meeting/schedule-meeting.module').then(m => m.ScheduleMeetingPageModule)
+      },
       {
         path: 'admin-dashboard',
         loadChildren: () => import('./admin-dashboard/admin-dashboard.module').then(m => m.AdminDashboardPageModule)
