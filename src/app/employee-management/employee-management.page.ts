@@ -1,10 +1,11 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { AlertController, LoadingController, ToastController } from '@ionic/angular';
+import { AlertController, LoadingController, ToastController, ModalController } from '@ionic/angular';
 import { DatabaseService } from '../services/database.service';
 import { User } from '../models/user.model';
 import { Subscription } from 'rxjs';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { first } from 'rxjs/operators';
+import { AddUserModalComponent } from '../add-user-modal/add-user-modal.component';
 
 @Component({
   selector: 'app-employee-management',
@@ -22,23 +23,12 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
   filteredUsers: User[] = [];
   profilePicture: string | null = null;
 
-  isAddUserModalOpen: boolean = false;
-  newUser: User = {
-    Name: '',
-    Email: '',
-    Password: '',
-    Role: 'employee',
-    Username: '',
-    ApprovalStatus: 'pending',
-    ProfilePicture: undefined
-  };
-
-
   constructor(
     private databaseService: DatabaseService,
     private alertController: AlertController,
     private loadingController: LoadingController,
-    private toastController: ToastController
+    private toastController: ToastController,
+    private modalController: ModalController
   ) {}
 
   ngOnInit() {
@@ -52,44 +42,33 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
   }
 
   loadMoreUsers(event: any) {
+    // Implement pagination logic here if needed
     event.target.complete();
   }
 
+  async openAddUserModal() {
+    const modal = await this.modalController.create({
+      component: AddUserModalComponent
+    });
+    
+    await modal.present();
 
-  openAddUserModal() {
-    this.isAddUserModalOpen = true;
-    console.log('Modal abierto:', this.isAddUserModalOpen);
+    const { data, role } = await modal.onDidDismiss();
+    if (role === 'confirm' && data) {
+      await this.submitAddUser(data);
+    }
   }
 
-  cancelAddUser() {
-    this.isAddUserModalOpen = false;
-    this.resetNewUser();
-  }
-
-  resetNewUser() {
-    this.newUser = {
-      Name: '',
-      Email: '',
-      Password: '',
-      Role: 'employee',
-      Username: '',
-      ApprovalStatus: 'pending',
-      ProfilePicture: undefined
-    };
-  }
-
-  async submitAddUser() {
-    if (this.newUser.Name && this.newUser.Email && this.newUser.Password) {
-      this.newUser.Username = this.newUser.Email;
+  async submitAddUser(userData: User) {
+    if (userData.Name && userData.Email && userData.Password) {
+      userData.Username = userData.Email;
       try {
-        const userId = await this.databaseService.createUser(this.newUser);
+        const userId = await this.databaseService.createUser(userData);
         if (userId) {
-          this.newUser.UserID = userId;
-          this.users.push({ ...this.newUser });
+          userData.UserID = userId;
+          this.users.push({ ...userData });
           this.filteredUsers = [...this.users];
           this.presentToast('Usuario creado con éxito', 'success');
-          this.isAddUserModalOpen = false;
-          this.resetNewUser();
         }
       } catch (error) {
         console.error('Error al crear usuario:', error);
@@ -158,83 +137,6 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
     }
   }
 
-  async addUser() {
-    const alert = await this.alertController.create({
-      header: 'Agregar Empleado',
-      inputs: [
-        { name: 'name', type: 'text', placeholder: 'Nombre' },
-        { name: 'email', type: 'email', placeholder: 'Correo electrónico' },
-        { name: 'password', type: 'password', placeholder: 'Contraseña' },
-        {
-          name: 'role',
-          type: 'radio',
-          label: 'Empleado',
-          value: 'employee',
-          checked: true
-        },
-        {
-          name: 'role',
-          type: 'radio',
-          label: 'Administrador',
-          value: 'admin'
-        },
-        {
-          name: 'approvalStatus',
-          type: 'radio',
-          label: 'Aprobado',
-          value: 'approved',
-          checked: true
-        },
-        {
-          name: 'approvalStatus',
-          type: 'radio',
-          label: 'Pendiente',
-          value: 'pending'
-        }
-      ],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Agregar',
-          handler: (data) => {
-            this.createUser(data);
-          }
-        }
-      ]
-    });
-
-    await alert.present();
-  }
-
-  async createUser(userData: {name: string, email: string, password: string, role: 'employee' | 'admin', approvalStatus: 'approved' | 'pending'}) {
-    if (!userData.name || !userData.email || !userData.password) {
-      this.presentToast('Por favor, complete todos los campos', 'danger');
-      return;
-    }
-
-    const newUser: User = {
-      Name: userData.name,
-      Email: userData.email,
-      Password: userData.password,
-      Role: userData.role,
-      Username: userData.email,
-      ApprovalStatus: userData.approvalStatus,
-      ProfilePicture: undefined 
-    };
-
-    try {
-      const userId = await this.databaseService.createUser(newUser);
-      if (userId) {
-        newUser.UserID = userId;
-        this.users.push(newUser);
-        this.presentToast('Usuario creado con éxito', 'success');
-      }
-    } catch (error) {
-      console.error('Error al crear usuario:', error);
-      this.presentToast('Error al crear usuario', 'danger');
-    }
-  }
-
   async changeProfilePicture(user: User) {
     try {
       const image = await Camera.getPhoto({
@@ -248,14 +150,12 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
       if (profilePicture) {
         await this.databaseService.updateUserProfilePicture(user.UserID!, profilePicture);
         
-        // Actualizar el usuario en la lista local
         const index = this.users.findIndex(u => u.UserID === user.UserID);
         if (index !== -1) {
           this.users[index].ProfilePicture = profilePicture;
           this.filteredUsers = [...this.users];
         }
   
-        // Si el usuario actual es el administrador, actualizar también el localStorage
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         if (currentUser.id === user.UserID) {
           currentUser.profilePicture = profilePicture;
@@ -288,6 +188,7 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
       console.error('Error al recargar usuario:', error);
     }
   }
+
   async changeRole(user: User) {
     const alert = await this.alertController.create({
       header: 'Cambiar Rol',
@@ -382,10 +283,8 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
       let success: boolean;
       
       if (status === 'pending') {
-        // Si el estado es 'pending', simplemente actualizamos el usuario localmente
         success = true;
       } else {
-        // Si el estado es 'approved' o 'rejected', llamamos al método del servicio
         const result = await this.databaseService.updateUserApprovalStatus(user.UserID!, status).toPromise();
         success = result !== undefined ? result : false;
       }
@@ -393,7 +292,7 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
       if (success) {
         user.ApprovalStatus = status;
         this.presentToast(`Usuario ${status === 'approved' ? 'aprobado' : status === 'pending' ? 'pendiente' : 'rechazado'} con éxito`, 'success');
-        await this.loadUsers(); // Recargar la lista de usuarios
+        await this.loadUsers();
       } else {
         throw new Error('No se pudo actualizar el estado de aprobación');
       }
@@ -401,7 +300,9 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
       console.error('Error al actualizar el estado de aprobación:', error);
       this.presentToast('Error al actualizar el estado de aprobación', 'danger');
     }
-  } async deleteUser(user: User) {
+  }
+
+  async deleteUser(user: User) {
     const loading = await this.loadingController.create({
       message: 'Eliminando usuario...',
     });
@@ -411,6 +312,7 @@ export class EmployeeManagementPage implements OnInit, OnDestroy {
       const success = await this.databaseService.deleteUser(user.UserID!).toPromise();
       if (success) {
         this.users = this.users.filter(u => u.UserID !== user.UserID);
+        this.filteredUsers = this.filteredUsers.filter(u => u.UserID !== user.UserID);
         this.presentToast('Usuario eliminado con éxito', 'success');
       } else {
         throw new Error('No se pudo eliminar el usuario');
