@@ -1,6 +1,6 @@
 {
   "appId": "com.example.app",
-  "appName": "app-caffemanagement",
+  "appName": "CaffeManagement",
   "webDir": "www",
   "bundledWebRuntime": false,
   "server": {

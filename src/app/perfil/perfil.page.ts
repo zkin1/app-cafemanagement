@@ -6,7 +6,6 @@ import { DatabaseService } from '../services/database.service';
 import { User } from '../models/user.model';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { FormBuilder, FormGroup, Validators, AbstractControl } from '@angular/forms';
-
 @Component({
   selector: 'app-perfil',
   templateUrl: './perfil.page.html',
@@ -25,14 +24,13 @@ export class PerfilPage implements OnInit, OnDestroy {
     Role: 'employee',
     Name: '',
     Email: '',
-    PhoneNumber: '',
-    HireDate: new Date(),
     LastLogin: new Date(),
     ApprovalStatus: 'approved'
   };
 
   perfilForm: FormGroup;
   passwordForm: FormGroup;
+  private currentPassword: string = '';
 
   esAdmin: boolean = false;
   private subscriptions: Subscription = new Subscription();
@@ -47,13 +45,12 @@ export class PerfilPage implements OnInit, OnDestroy {
   ) { 
     this.perfilForm = this.formBuilder.group({
       name: ['', [Validators.required, Validators.minLength(3)]],
-      email: ['', [Validators.required, Validators.email]],
-      phoneNumber: ['']
+      email: ['', [Validators.required, Validators.email]]
     });
 
     this.passwordForm = this.formBuilder.group({
       contrasenaActual: ['', [Validators.required]],
-      nuevaContrasena: ['', [Validators.required, Validators.minLength(8), this.passwordValidator]],
+      nuevaContrasena: ['', [Validators.required, Validators.minLength(6), this.passwordValidator]],
       confirmarContrasena: ['', [Validators.required]]
     }, { validators: this.passwordMatchValidator });
   }
@@ -221,6 +218,15 @@ export class PerfilPage implements OnInit, OnDestroy {
 
   async cambiarContrasena() {
     if (this.passwordForm.valid) {
+      const formValues = this.passwordForm.value;
+      
+      // Verificar que la contraseña actual coincida
+      if (formValues.contrasenaActual !== this.currentPassword) {
+        this.toastColor = 'danger';
+        await this.presentToast('La contraseña actual no es correcta');
+        return;
+      }
+
       const alert = await this.alertController.create({
         header: 'Confirmar cambio de contraseña',
         message: '¿Estás seguro de que quieres cambiar tu contraseña?',
@@ -240,7 +246,8 @@ export class PerfilPage implements OnInit, OnDestroy {
 
       await alert.present();
     } else {
-      await this.presentToast('Por favor, complete todos los campos correctamente.');
+      this.toastColor = 'danger';
+      await this.presentToast('Por favor, complete todos los campos correctamente');
     }
   }
 
@@ -252,20 +259,26 @@ export class PerfilPage implements OnInit, OnDestroy {
 
     try {
       const formValues = this.passwordForm.value;
-      const success = await this.updateUserPassword(
-        this.usuario.UserID!,
-        formValues.contrasenaActual,
-        formValues.nuevaContrasena
-      );
+      const success = await this.databaseService
+        .updateUserPassword(
+          this.usuario.UserID!,
+          formValues.contrasenaActual,
+          formValues.nuevaContrasena
+        ).toPromise();
+
       if (success) {
+        this.currentPassword = formValues.nuevaContrasena;
+        this.toastColor = 'success';
         await this.presentToast('Contraseña cambiada con éxito');
         this.passwordForm.reset();
       } else {
-        throw new Error('No se pudo cambiar la contraseña');
+        this.toastColor = 'danger';
+        await this.presentToast('Error al cambiar la contraseña');
       }
     } catch (error) {
       console.error('Error al cambiar la contraseña:', error);
-      await this.presentToast('Error al cambiar la contraseña. Por favor, intente de nuevo.');
+      this.toastColor = 'danger';
+      await this.presentToast('Error al cambiar la contraseña');
     } finally {
       await loading.dismiss();
     }
