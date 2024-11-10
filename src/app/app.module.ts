@@ -4,22 +4,18 @@ import { RouteReuseStrategy } from '@angular/router';
 import { IonicModule, IonicRouteStrategy } from '@ionic/angular';
 import { AppComponent } from './app.component';
 import { AppRoutingModule } from './app-routing.module';
-import { DatabaseService } from './services/database.service';
-import { SQLite } from '@awesome-cordova-plugins/sqlite/ngx';
-import { Capacitor } from '@capacitor/core';
+import { EmailService } from './services/email.service';
 
 @NgModule({
   declarations: [AppComponent],
   imports: [
-    BrowserModule, 
-    IonicModule.forRoot(), 
+    BrowserModule,
+    IonicModule.forRoot(),
     AppRoutingModule
   ],
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
-    DatabaseService,
-    SQLite,
-    { provide: 'PLATFORM', useValue: Capacitor }
+    EmailService
   ],
   bootstrap: [AppComponent]
 })

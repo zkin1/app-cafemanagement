@@ -813,5 +813,19 @@ insertSeedData(): Observable<boolean> {
     await this.database.executeSql(query, []);
   }
   
+  updatePassword(userId: number, newPassword: string): Observable<boolean> {
+    const sql = 'UPDATE Users SET Password = ? WHERE UserID = ?';
+    return new Observable(observer => {
+      this.database.executeSql(sql, [newPassword, userId])
+        .then(result => {
+          observer.next(result.rowsAffected > 0);
+          observer.complete();
+        })
+        .catch(error => {
+          observer.error(error);
+        });
+    });
+  }
+  
 }
 

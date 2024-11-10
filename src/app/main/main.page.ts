@@ -14,6 +14,7 @@ interface ExtendedProduct extends Product {
   imageURL: string;
 }
 
+
 @Component({
   selector: 'app-main',
   templateUrl: './main.page.html',
@@ -41,7 +42,10 @@ export class MainPage implements OnInit, OnDestroy {
 
   private navigationSubscription: Subscription = new Subscription();
   
-  
+  private getCurrentUserId(): number | null {
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    return currentUser.id || null;
+  }
 
   constructor(
     private router: Router,
@@ -79,21 +83,28 @@ export class MainPage implements OnInit, OnDestroy {
   }
 
   loadCurrentOrder() {
-    const storedOrder = JSON.parse(localStorage.getItem('currentOrder') || 'null');
-    if (storedOrder) {
-      this.currentOrderNumber = storedOrder.orderNumber;
-      this.currentOrderItems = storedOrder.items || [];
+    const userId = this.getCurrentUserId();
+    if (userId) {
+      const storedOrder = JSON.parse(localStorage.getItem(`cart_${userId}`) || 'null');
+      if (storedOrder) {
+        this.currentOrderNumber = storedOrder.orderNumber;
+        this.currentOrderItems = storedOrder.items || [];
+      } else {
+        this.loadCurrentOrderNumber();
+        this.currentOrderItems = [];
+      }
     } else {
-      this.loadCurrentOrderNumber();
       this.currentOrderItems = [];
     }
-    console.log('Current order loaded:', { number: this.currentOrderNumber, items: this.currentOrderItems });
   }
 
   resetCart() {
-    const lastOrderNumber = parseInt(localStorage.getItem('lastOrderNumber') || '0');
-    this.currentOrderNumber = lastOrderNumber + 1;
-    localStorage.setItem('lastOrderNumber', this.currentOrderNumber.toString());
+    const userId = this.getCurrentUserId();
+    if (userId) {
+      const lastOrderNumber = parseInt(localStorage.getItem(`lastOrderNumber_${userId}`) || '0');
+      this.currentOrderNumber = lastOrderNumber + 1;
+      localStorage.setItem(`lastOrderNumber_${userId}`, this.currentOrderNumber.toString());
+    }
   }
 
 
@@ -209,12 +220,14 @@ export class MainPage implements OnInit, OnDestroy {
   }
 
   updateLocalStorage() {
-    localStorage.setItem('currentOrder', JSON.stringify({
-      orderNumber: this.currentOrderNumber,
-      items: this.currentOrderItems
-    }));
-    localStorage.setItem('lastOrderNumber', this.currentOrderNumber.toString());
-    console.log('Local storage updated:', { number: this.currentOrderNumber, items: this.currentOrderItems });
+    const userId = this.getCurrentUserId();
+    if (userId) {
+      localStorage.setItem(`cart_${userId}`, JSON.stringify({
+        orderNumber: this.currentOrderNumber,
+        items: this.currentOrderItems
+      }));
+      localStorage.setItem(`lastOrderNumber_${userId}`, this.currentOrderNumber.toString());
+    }
   }
 
   async completeOrder() {
@@ -252,9 +265,12 @@ export class MainPage implements OnInit, OnDestroy {
   }
   
   loadCurrentOrderNumber() {
-    const lastOrderNumber = parseInt(localStorage.getItem('lastOrderNumber') || '0');
-    this.currentOrderNumber = lastOrderNumber + 1;
-    localStorage.setItem('lastOrderNumber', this.currentOrderNumber.toString());
+    const userId = this.getCurrentUserId();
+    if (userId) {
+      const lastOrderNumber = parseInt(localStorage.getItem(`lastOrderNumber_${userId}`) || '0');
+      this.currentOrderNumber = lastOrderNumber + 1;
+      localStorage.setItem(`lastOrderNumber_${userId}`, this.currentOrderNumber.toString());
+    }
   }
 
   // Método para manejar la actualización de cantidad directamente en la página principal

@@ -52,14 +52,23 @@ export class CarroComprasPage implements OnInit {
     this.loadOrder();
   }
 
+  private getCurrentUserId(): number | null {
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    return currentUser.id || null;
+  }
   loadOrder() {
-    const storedOrder = JSON.parse(localStorage.getItem('currentOrder') || 'null');
-    if (storedOrder) {
-      this.currentOrder.orderNumber = storedOrder.orderNumber;
-      this.currentOrder.items = storedOrder.items;
-      this.currentOrderItems = storedOrder.items;
+    const userId = this.getCurrentUserId();
+    if (userId) {
+      const storedOrder = JSON.parse(localStorage.getItem(`cart_${userId}`) || 'null');
+      if (storedOrder) {
+        this.currentOrder.orderNumber = storedOrder.orderNumber;
+        this.currentOrder.items = storedOrder.items;
+        this.currentOrderItems = storedOrder.items;
+      } else {
+        this.router.navigate(['/main']);
+      }
     } else {
-      this.router.navigate(['/main']);
+      this.router.navigate(['/login']);
     }
     this.calculateTotal();
   }
@@ -107,11 +116,15 @@ export class CarroComprasPage implements OnInit {
   }
 
   updateLocalStorage() {
-    localStorage.setItem('currentOrder', JSON.stringify({
-      orderNumber: this.currentOrder.id,
-      items: this.currentOrderItems
-    }));
+    const userId = this.getCurrentUserId();
+    if (userId) {
+      localStorage.setItem(`cart_${userId}`, JSON.stringify({
+        orderNumber: this.currentOrder.id,
+        items: this.currentOrderItems
+      }));
+    }
   }
+
 
   async confirmarOrden() {
     if (this.currentOrderItems.length === 0) {
@@ -123,6 +136,13 @@ export class CarroComprasPage implements OnInit {
       await this.presentToast('Por favor, seleccione un número de mesa antes de confirmar la orden.');
       return;
     }
+
+    const userId = this.getCurrentUserId();
+    if (!userId) {
+      await this.presentToast('Error: Sesión no válida. Por favor, inicie sesión nuevamente.');
+      this.router.navigate(['/login']);
+      return;
+    }
   
     const loading = await this.loadingController.create({
       message: 'Procesando orden...',
@@ -130,10 +150,9 @@ export class CarroComprasPage implements OnInit {
     await loading.present();
   
     try {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      this.currentOrder.userId = currentUser.id;
+      // Asignamos el userId del método getCurrentUserId
+      this.currentOrder.userId = userId;
   
-      // Creamos la orden sin los items primero
       const orderToSave: Order = {
         userId: this.currentOrder.userId,
         orderNumber: this.currentOrder.orderNumber,
@@ -159,21 +178,18 @@ export class CarroComprasPage implements OnInit {
         await this.databaseService.addProductToOrder(orderDetail);
       }
   
-      await loading.dismiss();
-      await this.presentToast('Orden confirmada con éxito');
-  
-      // Incrementar el número de orden en el almacenamiento local
-      const lastOrderNumber = parseInt(localStorage.getItem('lastOrderNumber') || '0');
-      const newOrderNumber = lastOrderNumber + 1;
-      localStorage.setItem('lastOrderNumber', newOrderNumber.toString());
+      // Limpiar datos específicos del usuario
+      localStorage.removeItem(`cart_${userId}`);
+      localStorage.removeItem(`lastOrderNumber_${userId}`);
       
-      // Limpiar la orden actual
-      localStorage.removeItem('currentOrder');
-  
-      // Resetear el contador de items
+      // Resetear el carrito
       this.currentOrderItems = [];
+      this.currentOrder.items = [];
       this.updateLocalStorage();
   
+      await loading.dismiss();
+      await this.presentToast('Orden confirmada con éxito');
+      
       // Navegar a la página principal
       this.router.navigate(['/main']);
   
@@ -182,7 +198,7 @@ export class CarroComprasPage implements OnInit {
       await loading.dismiss();
       await this.presentToast('Error al confirmar la orden. Por favor, intente de nuevo.');
     }
-  }
+}
 
   async presentToast(message: string) {
     const toast = await this.toastController.create({
