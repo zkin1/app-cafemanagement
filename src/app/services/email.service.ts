@@ -1,47 +1,140 @@
 import { Injectable } from '@angular/core';
 import { Observable, from } from 'rxjs';
-import * as nodemailer from 'nodemailer';
+import { map, catchError, timeout } from 'rxjs/operators';
+import { EmailResult } from '../models/email.interface';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import emailjs from '@emailjs/browser';
+
 
 @Injectable({
   providedIn: 'root'
 })
 export class EmailService {
-  private transporter: nodemailer.Transporter;
+  private readonly PUBLIC_KEY = 'DKpjvXERVCYX9x65l';
+  private readonly SERVICE_ID = 'service_ilwn599';
+  private readonly VERIFICATION_TEMPLATE_ID = 'template_okp70bp';
+  private readonly MEETING_TEMPLATE_ID = 'template_lxd51ex';
 
-  constructor() {
-    this.transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: 'caffemanagement@gmail.com',
-        pass: 'ookz wztn afmw lhlu' 
-      },
-      tls: {
-        rejectUnauthorized: false
-      }
-    });
+  constructor(private http: HttpClient) {
+    emailjs.init(this.PUBLIC_KEY);
   }
 
-  sendVerificationCode(to: string, code: string): Observable<any> {
-    const mailOptions = {
-      from: '"CaffeManagement" <caffemanagement@gmail.com>',
-      to: to,
-      subject: 'Código de Verificación - CaffeManagement',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f5f5f5;">
-          <div style="background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <h2 style="color: #84B0A2; text-align: center;">CaffeManagement</h2>
-            <h3 style="color: #405770;">Código de Verificación</h3>
-            <p style="color: #666;">Su código de verificación para restablecer la contraseña es:</p>
-            <div style="background-color: #f8f9fa; padding: 15px; text-align: center; border-radius: 5px; margin: 20px 0;">
-              <h1 style="color: #405770; margin: 0; letter-spacing: 5px;">${code}</h1>
-            </div>
-            <p style="color: #666; font-size: 14px;">Este código expirará en 15 minutos.</p>
-            <p style="color: #666; font-size: 12px; margin-top: 20px;">Si usted no solicitó este cambio de contraseña, por favor ignore este correo.</p>
-          </div>
-        </div>
-      `
+  sendVerificationCode(to: string, code: string): Observable<EmailResult> {
+    console.log('Attempting to send verification code to:', to);
+    
+    const templateParams = {
+      to_name: to.split('@')[0], 
+      from_name: "CaffeManagement",
+      to_email: to,
+      message: code, 
+      subject: "Código de verificación"
     };
 
-    return from(this.transporter.sendMail(mailOptions));
+    const headers = new HttpHeaders({
+      'Content-Type': 'application/json'
+    });
+
+    // Try both methods - EmailJS SDK and direct HTTP
+    return from(emailjs.send(
+      this.SERVICE_ID,
+      this.VERIFICATION_TEMPLATE_ID,
+      templateParams
+    )).pipe(
+      timeout(10000),
+      map(response => {
+        console.log('Email sent successfully:', response);
+        return {
+          messageId: Date.now().toString(),
+          success: true,
+          text: 'Email sent successfully'
+        };
+      }),
+      catchError(error => {
+        console.error('Email sending error details:', {
+          error,
+          errorMessage: error.message,
+          errorStack: error.stack,
+          errorStatus: error.status,
+          errorStatusText: error.statusText,
+          errorResponse: error.error,
+          timestamp: new Date().toISOString(),
+          templateParams
+        });
+        
+        return from([{
+          messageId: '',
+          success: false,
+          error: this.getReadableErrorMessage(error)
+        }]);
+      })
+    );
+  }
+
+  sendMeetingInvitation(
+    to: string,
+    meetingTitle: string,
+    meetingDateTime: string,
+    meetingDescription: string
+  ): Observable<EmailResult> {
+    console.log('Sending meeting invitation to:', to);
+
+    const templateParams = {
+      to_email: to,
+      to_name: to.split('@')[0], // Extraemos el nombre del email
+      from_name: "CaffeManagement",
+      meeting_title: meetingTitle,
+      meeting_datetime: meetingDateTime,
+      meeting_description: meetingDescription || 'Sin descripción'
+    };
+
+    return from(emailjs.send(
+      this.SERVICE_ID,
+      this.MEETING_TEMPLATE_ID,
+      templateParams
+    )).pipe(
+      timeout(10000),
+      map(response => {
+        console.log('Meeting invitation sent successfully:', response);
+        return {
+          messageId: Date.now().toString(),
+          success: true,
+          text: 'Meeting invitation sent successfully'
+        };
+      }),
+      catchError(error => {
+        console.error('Error sending meeting invitation:', {
+          error,
+          to,
+          meetingTitle,
+          timestamp: new Date().toISOString()
+        });
+        
+        return from([{
+          messageId: '',
+          success: false,
+          error: this.getReadableErrorMessage(error)
+        }]);
+      })
+    );
+  }
+
+  private getReadableErrorMessage(error: any): string {
+    if (!navigator.onLine) {
+      return 'No hay conexión a Internet. Por favor, verifique su conexión.';
+    }
+
+    if (error.status === 0) {
+      return 'No se pudo conectar con el servidor. Por favor, intente nuevamente.';
+    }
+    
+    if (error.status === 403) {
+      return 'Error de autenticación con el servicio de correo.';
+    }
+
+    if (error.name === 'TimeoutError') {
+      return 'La solicitud ha excedido el tiempo de espera. Por favor, intente nuevamente.';
+    }
+
+    return error.message || 'Error desconocido al enviar el correo';
   }
 }

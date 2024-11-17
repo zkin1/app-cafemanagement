@@ -29,12 +29,13 @@ export class AuthGuard implements CanActivate {
     }
 
     // Usuario no autenticado
-    if (state.url !== '/login' && state.url !== '/register') {
-      // Si el usuario no está autenticado y trata de acceder a una página protegida
-      this.router.navigate(['/login']);
-      return false;
-    }
-
-    return true;
+    if (state.url !== '/login' && 
+      state.url !== '/register' && 
+      state.url !== '/forgot-password') { 
+    this.router.navigate(['/login']);
+    return false;
   }
+
+  return true;
+}
 }

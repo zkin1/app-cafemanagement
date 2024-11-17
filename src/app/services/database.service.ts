@@ -655,7 +655,7 @@ export class DatabaseService {
 insertSeedData(): Observable<boolean> {
     const users = [
       { username: 'Admin Carlos', password: 'admin123', role: 'admin', name: 'Carlos', email: 'admin@cafeteria.com', approvalStatus: 'approved' },
-      { username: 'Empleado', password: 'emp123', role: 'employee', name: 'Employee One', email: 'empleado1@cafeteria.com', approvalStatus: 'approved' }
+      { username: 'Empleado', password: 'emp123', role: 'employee', name: 'Emp 1', email: 'empleado1@cafeteria.com', approvalStatus: 'approved' }
     ];
   
     const products = [

@@ -1,8 +1,9 @@
 import { Component } from '@angular/core';
-import { ToastController } from '@ionic/angular';
-import emailjs, { EmailJSResponseStatus } from '@emailjs/browser';
+import { ToastController, LoadingController } from '@ionic/angular';
 import { DatabaseService } from '../services/database.service';
+import { EmailService } from '../services/email.service';
 import { User } from '../models/user.model';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-schedule-meeting',
@@ -19,54 +20,115 @@ export class ScheduleMeetingPage {
 
   users: User[] = [];
   currentDate: string;
+  isSubmitting: boolean = false;
 
-  constructor(private toastController: ToastController, private databaseService: DatabaseService) {
+  constructor(
+    private toastController: ToastController,
+    private loadingController: LoadingController,
+    private databaseService: DatabaseService,
+    private emailService: EmailService
+  ) {
     this.currentDate = new Date().toISOString();
   }
 
   ngOnInit() {
-    // Cargar usuarios desde la base de datos
-    this.databaseService.getAllUsers().subscribe(
-      users => this.users = users,
-      error => console.error('Error al cargar los usuarios:', error)
-    );
+    this.loadUsers();
+  }
+
+  private async loadUsers() {
+    try {
+      this.users = await firstValueFrom(this.databaseService.getAllUsers());
+    } catch (error) {
+      console.error('Error al cargar los usuarios:', error);
+      await this.presentToast('Error al cargar los usuarios', 'danger');
+    }
+  }
+
+  private formatDateTime(dateString: string): string {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (error) {
+      console.error('Error al formatear fecha:', error);
+      return dateString;
+    }
   }
 
   async scheduleMeeting(e: Event) {
     e.preventDefault();
 
+    if (this.isSubmitting) return;
+    this.isSubmitting = true;
+
+    if (this.meeting.participants.length === 0) {
+      await this.presentToast('Debes seleccionar al menos un participante.', 'warning');
+      this.isSubmitting = false;
+      return;
+    }
+
+    const loading = await this.loadingController.create({
+      message: 'Programando reunión...',
+    });
+    await loading.present();
+
     try {
-      if (this.meeting.participants.length === 0) {
-        throw new Error('Debes seleccionar al menos un participante.');
+      const formattedDateTime = this.formatDateTime(this.meeting.datetime);
+      let failedEmails: string[] = [];
+
+      // Enviar correos a todos los participantes
+      for (const participantEmail of this.meeting.participants) {
+        try {
+          const result = await firstValueFrom(
+            this.emailService.sendMeetingInvitation(
+              participantEmail,
+              this.meeting.title,
+              formattedDateTime,
+              this.meeting.description
+            )
+          );
+
+          if (!result.success) {
+            failedEmails.push(participantEmail);
+          }
+        } catch (error) {
+          console.error(`Error al enviar correo a ${participantEmail}:`, error);
+          failedEmails.push(participantEmail);
+        }
       }
-  
-      const participantsEmails = this.meeting.participants.join(',');
-  
-      const templateParams = {
-        to_email: participantsEmails, 
-        meeting_title: this.meeting.title,
-        meeting_datetime: this.meeting.datetime,
-        meeting_description: this.meeting.description
-      };
-  
-      // Enviar el correo electrónico utilizando EmailJS
-      emailjs.send('service_wfe771n', 'template_lxd51ex', templateParams, 'DKpjvXERVCYX9x65l')
-        .then(() => {
-          console.log('SUCCESS!');
-          this.presentToast('Reunión programada y correos enviados con éxito', 'success');
-          this.resetForm();
-        }, (error: EmailJSResponseStatus) => {
-          console.error('FAILED...', error.text);
-          this.presentToast('Error al programar la reunión', 'danger');
-        });
+
+      await loading.dismiss();
+
+      if (failedEmails.length > 0) {
+        await this.presentToast(
+          `Reunión programada pero hubo errores al enviar algunos correos: ${failedEmails.join(', ')}`,
+          'warning'
+        );
+      } else {
+        await this.presentToast('Reunión programada y correos enviados con éxito', 'success');
+        this.resetForm();
+      }
     } catch (error) {
-      console.error('Error al programar la reunión:', error); 
-      this.presentToast('Error al programar la reunión', 'danger');
+      console.error('Error al programar la reunión:', error);
+      await this.presentToast(
+        'Error al programar la reunión. Por favor, intente de nuevo.',
+        'danger'
+      );
+    } finally {
+      this.isSubmitting = false;
+      if (loading) {
+        await loading.dismiss();
+      }
     }
   }
-  
+
   resetForm() {
-    // Restablecer los valores del formulario después de programar la reunión
     this.meeting = {
       title: '',
       datetime: '',
@@ -75,13 +137,13 @@ export class ScheduleMeetingPage {
     };
   }
 
-  async presentToast(message: string, color: string) {
-    // Mostrar un mensaje toast con el resultado de la operación
+  private async presentToast(message: string, color: 'success' | 'warning' | 'danger') {
     const toast = await this.toastController.create({
       message: message,
-      duration: 2000,
+      duration: 3000,
+      position: 'top',
       color: color
     });
-    toast.present();
+    await toast.present();
   }
 }

@@ -194,6 +194,28 @@ get isAdmin(): boolean {
   }
 
   logout() {
+    // Obtener el usuario actual antes de limpiar el localStorage
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    
+    // Limpiar datos específicos del usuario actual
+    if (currentUser.id) {
+      localStorage.removeItem(`cart_${currentUser.id}`);
+      localStorage.removeItem(`lastOrderNumber_${currentUser.id}`);
+    }
+    
+    // Limpiar datos de sesión y otros datos que puedan persistir
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('cart_') || key.startsWith('lastOrderNumber_'))) {
+        keysToRemove.push(key);
+      }
+    }
+    
+    // Eliminar todas las claves relacionadas con carritos y órdenes
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    // Finalmente, eliminar los datos del usuario y redirigir
     localStorage.removeItem('currentUser');
     this.router.navigate(['/login']);
   }

@@ -1,0 +1,48 @@
+/* karma-custom.css */
+body, html {
+    height: 100vh !important;
+    overflow: auto !important;
+}
+
+.jasmine_html-reporter {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow: visible !important;
+    padding-bottom: 200px !important; 
+    margin-bottom: 100px !important;
+}
+
+#details {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+.results-container {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+.spec {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+.symbol-summary {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 100 !important;
+    background: white !important;
+}
+
+
+.spec:last-child {
+    margin-bottom: 150px !important;
+}
+
+
+#HTMLReporter {
+    padding-bottom: 200px !important;
+}

@@ -31,13 +31,36 @@ interface ExtendedProduct extends Product {
     ])
   ]
 })
-export class MainPage implements OnInit, OnDestroy {
+export class MainPage implements OnInit {
   products: ExtendedProduct[] = [];
   currentOrderNumber: number = 1;
   currentOrderItems: any[] = [];
   isLoading: boolean = false;
   showToast: boolean = false;
   toastMessage: string = '';
+
+  currentOrder: {
+    orderNumber: number;
+    id: number;
+    userId: number;
+    tableNumber: number | null;
+    status: string;
+    notes: string;
+    totalAmount: number;
+    paymentMethod: string;
+    items: any[];
+  } = {
+    orderNumber: 0,
+    id: 0,
+    userId: 0,
+    tableNumber: null,
+    status: 'Solicitado',
+    notes: '',
+    totalAmount: 0,
+    paymentMethod: '',
+    items: []
+  };
+
 
 
   private navigationSubscription: Subscription = new Subscription();
@@ -84,19 +107,42 @@ export class MainPage implements OnInit, OnDestroy {
 
   loadCurrentOrder() {
     const userId = this.getCurrentUserId();
-    if (userId) {
-      const storedOrder = JSON.parse(localStorage.getItem(`cart_${userId}`) || 'null');
-      if (storedOrder) {
-        this.currentOrderNumber = storedOrder.orderNumber;
-        this.currentOrderItems = storedOrder.items || [];
+    
+    // Si no hay usuario actual, limpiar el carrito
+    if (!userId) {
+      this.currentOrderItems = [];
+      this.currentOrder = {
+        orderNumber: 0,
+        id: 0,
+        userId: 0,
+        tableNumber: null,
+        status: 'Solicitado',
+        notes: '',
+        totalAmount: 0,
+        paymentMethod: '',
+        items: []
+      };
+      return;
+    }
+  
+    // Cargar el carrito específico del usuario actual
+    const storedOrder = JSON.parse(localStorage.getItem(`cart_${userId}`) || 'null');
+    if (storedOrder) {
+      // Verificar que el carrito pertenezca al usuario actual
+      if (storedOrder.userId === userId) {
+        this.currentOrder.orderNumber = storedOrder.orderNumber;
+        this.currentOrder.items = storedOrder.items;
+        this.currentOrderItems = storedOrder.items;
       } else {
-        this.loadCurrentOrderNumber();
-        this.currentOrderItems = [];
+        // Si el carrito pertenece a otro usuario, limpiarlo
+        this.resetCart();
       }
     } else {
+      this.loadCurrentOrderNumber();
       this.currentOrderItems = [];
     }
   }
+  
 
   resetCart() {
     const userId = this.getCurrentUserId();
@@ -224,12 +270,12 @@ export class MainPage implements OnInit, OnDestroy {
     if (userId) {
       localStorage.setItem(`cart_${userId}`, JSON.stringify({
         orderNumber: this.currentOrderNumber,
+        userId: userId, // Añadir el userId al objeto guardado
         items: this.currentOrderItems
       }));
       localStorage.setItem(`lastOrderNumber_${userId}`, this.currentOrderNumber.toString());
     }
   }
-
   async completeOrder() {
     if (this.currentOrderItems.length === 0) {
       await this.presentToast('El carrito está vacío. Añada productos antes de completar la orden.');

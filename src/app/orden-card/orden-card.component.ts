@@ -1,4 +1,3 @@
-// orden-card.component.ts
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { Order } from '../models/order.model';
 

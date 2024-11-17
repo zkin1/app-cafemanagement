@@ -23,11 +23,10 @@ interface CartItem {
   styleUrls: ['./carro-compras.page.scss'],
 })
 export class CarroComprasPage implements OnInit {
-
   showToast: boolean = false;
   toastMessage: string = '';
   
-  currentOrder: Order & { items: CartItem[] } = {
+  currentOrder: Order & { items: any[] } = {
     orderNumber: 0,
     id: 0,
     userId: 0,
@@ -38,8 +37,7 @@ export class CarroComprasPage implements OnInit {
     paymentMethod: '',
     items: []
   };
-  currentOrderItems: CartItem[] = [];
-
+  currentOrderItems: any[] = [];
   constructor(
     private router: Router,
     private databaseService: DatabaseService,
@@ -58,17 +56,18 @@ export class CarroComprasPage implements OnInit {
   }
   loadOrder() {
     const userId = this.getCurrentUserId();
-    if (userId) {
-      const storedOrder = JSON.parse(localStorage.getItem(`cart_${userId}`) || 'null');
-      if (storedOrder) {
-        this.currentOrder.orderNumber = storedOrder.orderNumber;
-        this.currentOrder.items = storedOrder.items;
-        this.currentOrderItems = storedOrder.items;
-      } else {
-        this.router.navigate(['/main']);
-      }
-    } else {
+    if (!userId) {
       this.router.navigate(['/login']);
+      return;
+    }
+  
+    const storedOrder = JSON.parse(localStorage.getItem(`cart_${userId}`) || 'null');
+    if (storedOrder && storedOrder.userId === userId) {
+      this.currentOrder.orderNumber = storedOrder.orderNumber;
+      this.currentOrder.items = storedOrder.items;
+      this.currentOrderItems = storedOrder.items;
+    } else {
+      this.router.navigate(['/main']);
     }
     this.calculateTotal();
   }
@@ -150,7 +149,7 @@ export class CarroComprasPage implements OnInit {
     await loading.present();
   
     try {
-      // Asignamos el userId del método getCurrentUserId
+      // Asignamos el userId
       this.currentOrder.userId = userId;
   
       const orderToSave: Order = {
@@ -165,7 +164,7 @@ export class CarroComprasPage implements OnInit {
   
       const orderId = await this.databaseService.createOrder(orderToSave);
   
-      // Ahora añadimos los items de la orden
+      // Añadir los items de la orden
       for (const item of this.currentOrderItems) {
         const orderDetail: OrderDetail = {
           orderId: orderId,
@@ -178,15 +177,14 @@ export class CarroComprasPage implements OnInit {
         await this.databaseService.addProductToOrder(orderDetail);
       }
   
-      // Limpiar datos específicos del usuario
+      // Limpiar datos específicos del usuario actual
       localStorage.removeItem(`cart_${userId}`);
       localStorage.removeItem(`lastOrderNumber_${userId}`);
       
       // Resetear el carrito
       this.currentOrderItems = [];
       this.currentOrder.items = [];
-      this.updateLocalStorage();
-  
+      
       await loading.dismiss();
       await this.presentToast('Orden confirmada con éxito');
       

@@ -55,28 +55,28 @@ const routes: Routes = [
       }
     ]
   },
-  {
-    path: 'login',
-    loadChildren: () => import('./login/login.module').then(m => m.LoginPageModule)
-  },
-  {
-    path: 'register',
-    loadChildren: () => import('./register/register.module').then(m => m.RegisterPageModule)
-  },
-  {
-    path: 'not-found',
-    loadChildren: () => import('./not-found/not-found.module').then(m => m.NotFoundPageModule)
-  },
-  {
-    path: '**',
-    redirectTo: 'not-found',
-    pathMatch: 'full'
-  },  {
-    path: 'forgot-password',
-    loadChildren: () => import('./forgot-password/forgot-password.module').then( m => m.ForgotPasswordPageModule)
-  }
-
-];
+    {
+      path: 'login',
+      loadChildren: () => import('./login/login.module').then(m => m.LoginPageModule)
+    },
+    {
+      path: 'register',
+      loadChildren: () => import('./register/register.module').then(m => m.RegisterPageModule)
+    },
+    {
+      path: 'forgot-password',
+      loadChildren: () => import('./forgot-password/forgot-password.module').then(m => m.ForgotPasswordPageModule)
+    },
+    {
+      path: 'not-found',
+      loadChildren: () => import('./not-found/not-found.module').then(m => m.NotFoundPageModule)
+    },
+    {
+      path: '**',
+      redirectTo: 'not-found',
+      pathMatch: 'full'
+    }
+  ];
 
 @NgModule({
   imports: [
