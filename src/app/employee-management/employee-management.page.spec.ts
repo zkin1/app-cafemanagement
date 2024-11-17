@@ -5,7 +5,6 @@ describe('EmployeeManagementPage', () => {
   let component: EmployeeManagementPage;
   let fixture: ComponentFixture<EmployeeManagementPage>;
 
-  beforeEach(() => {
     fixture = TestBed.createComponent(EmployeeManagementPage);
     component = fixture.componentInstance;
     fixture.detectChanges();
